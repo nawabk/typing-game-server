@@ -15,7 +15,7 @@ const server = http.createServer(app);
 
 const io = new Server(server);
 
-const PLAYER_STACK: Player[] = [];
+const PLAYER_QUEUE: Player[] = [];
 
 const CHANNEL_INFO: Map<string, GameInfo> = new Map();
 
@@ -40,15 +40,15 @@ async function fetchParagraph(): Promise<string> {
 
 async function startPlayHandler(socket: Socket, io: Server, userName: string) {
   console.log("start play request");
-  if (PLAYER_STACK.length === 0) {
+  if (PLAYER_QUEUE.length === 0) {
     const player = {
       userName,
       socket,
     };
-    PLAYER_STACK.push(player);
+    PLAYER_QUEUE.push(player);
     timer = setTimeout(async () => {
       console.log("still no user");
-      PLAYER_STACK.pop();
+      PLAYER_QUEUE.pop();
       const channel = createChannel();
       CHANNEL_INFO.set(channel, {
         player1: socket,
@@ -68,7 +68,7 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       timer = null;
     }
     const { socket: competetorSocket, userName: competetorUserName } =
-      PLAYER_STACK.shift() as Player;
+      PLAYER_QUEUE.shift() as Player;
     const channel = createChannel();
     CHANNEL_INFO.set(channel, {
       player1: competetorSocket,
