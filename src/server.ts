@@ -4,12 +4,16 @@ import type { Socket } from "socket.io";
 import http from "http";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import { LOREM_TEXT } from "./Constants";
+import { LOREM_TEXT, ROBOT, ROBOT_SCORE } from "./Constants";
 import {
   ChallengeDetailsMessage,
+  ChallengeResult,
+  ChallengeScoreMessage,
   GameInfo,
   Player,
+  PlayerResultInfo,
   ResponseData,
+  Score,
 } from "./types";
 
 const app = express();
@@ -60,8 +64,14 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       PLAYER_QUEUE.pop();
       const channel = createChannel();
       CHANNEL_INFO.set(channel, {
-        player1: socket.id,
-        player2: "Computer",
+        playerOneResult: {
+          socketId: socket.id,
+          userName,
+        },
+        playerTwoResult: {
+          isRobot: true,
+          userName: ROBOT,
+        },
       });
       socket.join(channel);
       const paragraph = await fetchParagraph();
@@ -73,7 +83,7 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
           userName,
         },
         playerTwoInfo: {
-          userName: "Robot",
+          userName: ROBOT,
           isRobot: true,
         },
       };
@@ -88,8 +98,14 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       PLAYER_QUEUE.shift() as Player;
     const channel = createChannel();
     CHANNEL_INFO.set(channel, {
-      player1: competitorSocket.id,
-      player2: socket.id,
+      playerOneResult: {
+        socketId: competitorSocket.id,
+        userName: competitorUserName,
+      },
+      playerTwoResult: {
+        socketId: socket.id,
+        userName,
+      },
     });
     // socket.emit("competitor", competitorUserName);
     // competitorSocket.emit("competitor", userName);
@@ -114,10 +130,111 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
   }
 }
 
+// onChallengeScore handler
+
+function getRobotScore(): Score {
+  return ROBOT_SCORE[0];
+}
+
+function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
+  try {
+    const { channel } = message;
+    const channelInfo = CHANNEL_INFO.get(channel);
+    let challengeResult: Partial<ChallengeResult> = {};
+    if (channelInfo) {
+      const { playerOneResult, playerTwoResult } = channelInfo;
+      const { socketId, wpm, netWpm, accuracyInPerc } = message;
+
+      if (playerTwoResult.isRobot) {
+        const robotScore = getRobotScore();
+        const { netWpm: robotNetWpm, accuracyInPerc: robotAccuracyInPerc } =
+          robotScore;
+        challengeResult = {
+          playerOneResult: {
+            ...(playerOneResult && playerOneResult),
+            score: {
+              wpm,
+              netWpm,
+              accuracyInPerc,
+            },
+          },
+          playerTwoResult: {
+            ...(playerTwoResult && playerTwoResult),
+            score: robotScore,
+          },
+        };
+        if (netWpm === robotNetWpm) {
+          if (robotAccuracyInPerc === accuracyInPerc) {
+            challengeResult.draw = true;
+          } else if (robotAccuracyInPerc > accuracyInPerc) {
+            challengeResult.winner = ROBOT;
+          } else {
+            challengeResult.winner = playerOneResult?.socketId;
+          }
+        } else if (robotNetWpm > netWpm) {
+          challengeResult.winner = ROBOT;
+        } else {
+          challengeResult.winner = playerOneResult?.socketId;
+        }
+      } else {
+        let playerResult;
+        let otherPlayerResult;
+        if (socketId === playerOneResult.socketId) {
+          playerResult = playerOneResult;
+          challengeResult = {
+            ...challengeResult,
+            playerOneResult,
+          };
+          otherPlayerResult = playerTwoResult;
+        } else if (socketId === playerTwoResult.socketId) {
+          playerResult = playerTwoResult;
+          challengeResult = {
+            ...challengeResult,
+            playerTwoResult,
+          };
+          otherPlayerResult = playerOneResult;
+        } else {
+          throw new Error("Socket does not exist in the channel");
+        }
+        if (otherPlayerResult.isScoreRecieved) {
+          playerResult.isScoreRecieved = true;
+          playerResult.score = {
+            wpm,
+            netWpm,
+            accuracyInPerc,
+          };
+        } else {
+          const { score } = otherPlayerResult;
+          if (score && score?.netWpm === netWpm) {
+            if (score?.accuracyInPerc === accuracyInPerc) {
+              challengeResult.draw = true;
+            } else if (score?.accuracyInPerc > accuracyInPerc) {
+              challengeResult.winner = otherPlayerResult.socketId;
+            } else {
+              challengeResult.winner = playerResult.socketId;
+            }
+          } else if (score && score?.netWpm > netWpm) {
+            challengeResult.winner = otherPlayerResult.socketId;
+          } else {
+            challengeResult.winner = playerResult.socketId;
+          }
+        }
+      }
+    }
+    console.log({ challengeResult, channel });
+    io.to(channel).emit("challenge_result", challengeResult);
+  } catch (e) {
+    console.log(e);
+  }
+}
+
 io.on("connection", (socket: Socket) => {
   console.log("A user has connected", socket.id);
-  socket.on("start-play", (userName) => {
+  socket.on("start_play", (userName) => {
     startPlayHandler(socket, io, userName);
+  });
+  socket.on("challenge_score", (message) => {
+    onChallengeScoreHandler(io, message);
   });
 });
 

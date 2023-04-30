@@ -1,8 +1,29 @@
 import { Socket } from "socket.io";
 
+export interface Score {
+  wpm: number;
+  netWpm: number;
+  accuracyInPerc: number;
+}
+
+export interface PlayerResultInfo {
+  socketId: string;
+  userName: string;
+  isScoreRecieved?: boolean;
+  score: Score;
+  isRobot: boolean;
+}
+
 export interface GameInfo {
-  player1: string;
-  player2: string | "Computer";
+  playerOneResult: Partial<PlayerResultInfo>;
+  playerTwoResult: Partial<PlayerResultInfo>;
+}
+
+export interface ChallengeResult {
+  playerOneResult: Partial<PlayerResultInfo>;
+  playerTwoResult: Partial<PlayerResultInfo>;
+  winner: string;
+  draw?: boolean;
 }
 
 export type ResponseData = string[];
@@ -23,4 +44,12 @@ export interface ChallengeDetailsMessage {
   paragraph: string;
   playerOneInfo: PlayerInfo;
   playerTwoInfo: PlayerInfo;
+}
+
+export interface ChallengeScoreMessage {
+  socketId: string;
+  channel: string;
+  wpm: number;
+  netWpm: number;
+  accuracyInPerc: number;
 }

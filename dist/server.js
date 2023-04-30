@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -105,8 +116,14 @@ function startPlayHandler(socket, io, userName) {
                                     PLAYER_QUEUE.pop();
                                     channel = createChannel();
                                     CHANNEL_INFO.set(channel, {
-                                        player1: socket.id,
-                                        player2: "Computer",
+                                        playerOneResult: {
+                                            socketId: socket.id,
+                                            userName: userName,
+                                        },
+                                        playerTwoResult: {
+                                            isRobot: true,
+                                            userName: Constants_1.ROBOT,
+                                        },
                                     });
                                     socket.join(channel);
                                     return [4 /*yield*/, fetchParagraph()];
@@ -119,7 +136,7 @@ function startPlayHandler(socket, io, userName) {
                                             userName: userName,
                                         },
                                         playerTwoInfo: {
-                                            userName: "Robot",
+                                            userName: Constants_1.ROBOT,
                                             isRobot: true,
                                         },
                                     };
@@ -137,8 +154,14 @@ function startPlayHandler(socket, io, userName) {
                     _a = PLAYER_QUEUE.shift(), competitorSocket = _a.socket, competitorUserName = _a.userName;
                     channel = createChannel();
                     CHANNEL_INFO.set(channel, {
-                        player1: competitorSocket.id,
-                        player2: socket.id,
+                        playerOneResult: {
+                            socketId: competitorSocket.id,
+                            userName: competitorUserName,
+                        },
+                        playerTwoResult: {
+                            socketId: socket.id,
+                            userName: userName,
+                        },
                     });
                     // socket.emit("competitor", competitorUserName);
                     // competitorSocket.emit("competitor", userName);
@@ -169,10 +192,107 @@ function startPlayHandler(socket, io, userName) {
         });
     });
 }
+// onChallengeScore handler
+function getRobotScore() {
+    return Constants_1.ROBOT_SCORE[0];
+}
+function onChallengeScoreHandler(io, message) {
+    try {
+        var channel = message.channel;
+        var channelInfo = CHANNEL_INFO.get(channel);
+        var challengeResult = {};
+        if (channelInfo) {
+            var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+            var socketId = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
+            if (playerTwoResult.isRobot) {
+                var robotScore = getRobotScore();
+                var robotNetWpm = robotScore.netWpm, robotAccuracyInPerc = robotScore.accuracyInPerc;
+                challengeResult = {
+                    playerOneResult: __assign(__assign({}, (playerOneResult && playerOneResult)), { score: {
+                            wpm: wpm,
+                            netWpm: netWpm,
+                            accuracyInPerc: accuracyInPerc,
+                        } }),
+                    playerTwoResult: __assign(__assign({}, (playerTwoResult && playerTwoResult)), { score: robotScore }),
+                };
+                if (netWpm === robotNetWpm) {
+                    if (robotAccuracyInPerc === accuracyInPerc) {
+                        challengeResult.draw = true;
+                    }
+                    else if (robotAccuracyInPerc > accuracyInPerc) {
+                        challengeResult.winner = Constants_1.ROBOT;
+                    }
+                    else {
+                        challengeResult.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
+                    }
+                }
+                else if (robotNetWpm > netWpm) {
+                    challengeResult.winner = Constants_1.ROBOT;
+                }
+                else {
+                    challengeResult.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
+                }
+            }
+            else {
+                var playerResult = void 0;
+                var otherPlayerResult = void 0;
+                if (socketId === playerOneResult.socketId) {
+                    playerResult = playerOneResult;
+                    challengeResult = __assign(__assign({}, challengeResult), { playerOneResult: playerOneResult });
+                    otherPlayerResult = playerTwoResult;
+                }
+                else if (socketId === playerTwoResult.socketId) {
+                    playerResult = playerTwoResult;
+                    challengeResult = __assign(__assign({}, challengeResult), { playerTwoResult: playerTwoResult });
+                    otherPlayerResult = playerOneResult;
+                }
+                else {
+                    throw new Error("Socket does not exist in the channel");
+                }
+                if (otherPlayerResult.isScoreRecieved) {
+                    playerResult.isScoreRecieved = true;
+                    playerResult.score = {
+                        wpm: wpm,
+                        netWpm: netWpm,
+                        accuracyInPerc: accuracyInPerc,
+                    };
+                }
+                else {
+                    var score = otherPlayerResult.score;
+                    if (score && (score === null || score === void 0 ? void 0 : score.netWpm) === netWpm) {
+                        if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) === accuracyInPerc) {
+                            challengeResult.draw = true;
+                        }
+                        else if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) > accuracyInPerc) {
+                            challengeResult.winner = otherPlayerResult.socketId;
+                        }
+                        else {
+                            challengeResult.winner = playerResult.socketId;
+                        }
+                    }
+                    else if (score && (score === null || score === void 0 ? void 0 : score.netWpm) > netWpm) {
+                        challengeResult.winner = otherPlayerResult.socketId;
+                    }
+                    else {
+                        challengeResult.winner = playerResult.socketId;
+                    }
+                }
+            }
+        }
+        console.log({ challengeResult: challengeResult, channel: channel });
+        io.to(channel).emit("challenge_result", challengeResult);
+    }
+    catch (e) {
+        console.log(e);
+    }
+}
 io.on("connection", function (socket) {
     console.log("A user has connected", socket.id);
-    socket.on("start-play", function (userName) {
+    socket.on("start_play", function (userName) {
         startPlayHandler(socket, io, userName);
+    });
+    socket.on("challenge_score", function (message) {
+        onChallengeScoreHandler(io, message);
     });
 });
 var PORT = process.env.PORT || 5000;
