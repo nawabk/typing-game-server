@@ -5,7 +5,12 @@ import http from "http";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
 import { LOREM_TEXT } from "./Constants";
-import { GameInfo, Player, ResponseData } from "./types";
+import {
+  ChallengeDetailsMessage,
+  GameInfo,
+  Player,
+  ResponseData,
+} from "./types";
 
 const app = express();
 
@@ -13,7 +18,11 @@ app.use(cors({ origin: "http://localhost:3000" }));
 
 const server = http.createServer(app);
 
-const io = new Server(server);
+const io: Server = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+  },
+});
 
 const PLAYER_QUEUE: Player[] = [];
 
@@ -51,45 +60,62 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       PLAYER_QUEUE.pop();
       const channel = createChannel();
       CHANNEL_INFO.set(channel, {
-        player1: socket,
-        player2: "computer",
+        player1: socket.id,
+        player2: "Computer",
       });
       socket.join(channel);
       const paragraph = await fetchParagraph();
-      socket.emit("competitor", "computer");
-      io.to(channel).emit("challenge_details", {
+      //   socket.emit("competitor", "computer");
+      const message: ChallengeDetailsMessage = {
         channel,
         paragraph,
-      });
+        playerOneInfo: {
+          userName,
+        },
+        playerTwoInfo: {
+          userName: "Robot",
+          isRobot: true,
+        },
+      };
+      io.to(channel).emit("challenge_details", message);
     }, 5 * 1000);
   } else {
     if (timer) {
       clearTimeout(timer);
       timer = null;
     }
-    const { socket: competetorSocket, userName: competetorUserName } =
+    const { socket: competitorSocket, userName: competitorUserName } =
       PLAYER_QUEUE.shift() as Player;
     const channel = createChannel();
     CHANNEL_INFO.set(channel, {
-      player1: competetorSocket,
-      player2: socket,
+      player1: competitorSocket.id,
+      player2: socket.id,
     });
-    socket.emit("competitor", competetorUserName);
-    competetorSocket.emit("competitor", userName);
-    for (const userSocket of [competetorSocket, socket]) {
+    // socket.emit("competitor", competitorUserName);
+    // competitorSocket.emit("competitor", userName);
+    for (const userSocket of [competitorSocket, socket]) {
       userSocket.join(channel);
     }
-    const parapgraph = await fetchParagraph();
-    io.to(channel).emit("challenge_details", {
+    const paragraph = await fetchParagraph();
+    const message: ChallengeDetailsMessage = {
       channel,
-      parapgraph,
-    });
+      paragraph,
+      playerOneInfo: {
+        userName: competitorUserName,
+        socketId: competitorSocket.id,
+      },
+      playerTwoInfo: {
+        userName,
+        socketId: socket.id,
+      },
+    };
+    io.to(channel).emit("challenge_details", message);
     console.log("gameplay");
   }
 }
 
 io.on("connection", (socket: Socket) => {
-  console.log("A user has connected");
+  console.log("A user has connected", socket.id);
   socket.on("start-play", (userName) => {
     startPlayHandler(socket, io, userName);
   });

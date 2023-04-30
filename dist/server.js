@@ -48,8 +48,12 @@ var Constants_1 = require("./Constants");
 var app = express_1.default();
 app.use(cors_1.default({ origin: "http://localhost:3000" }));
 var server = http_1.default.createServer(app);
-var io = new socket_io_1.Server(server);
-var PLAYER_STACK = [];
+var io = new socket_io_1.Server(server, {
+    cors: {
+        origin: "http://localhost:3000",
+    },
+});
+var PLAYER_QUEUE = [];
 var CHANNEL_INFO = new Map();
 var timer = null;
 function createChannel() {
@@ -80,39 +84,46 @@ function fetchParagraph() {
 }
 function startPlayHandler(socket, io, userName) {
     return __awaiter(this, void 0, void 0, function () {
-        var player, _a, competetorSocket, competetorUserName, channel, _i, _b, userSocket, parapgraph;
+        var player, _a, competitorSocket, competitorUserName, channel, _i, _b, userSocket, paragraph, message;
         var _this = this;
         return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
                     console.log("start play request");
-                    if (!(PLAYER_STACK.length === 0)) return [3 /*break*/, 1];
+                    if (!(PLAYER_QUEUE.length === 0)) return [3 /*break*/, 1];
                     player = {
                         userName: userName,
                         socket: socket,
                     };
-                    PLAYER_STACK.push(player);
+                    PLAYER_QUEUE.push(player);
                     timer = setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
-                        var channel, paragraph;
+                        var channel, paragraph, message;
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0:
                                     console.log("still no user");
-                                    PLAYER_STACK.pop();
+                                    PLAYER_QUEUE.pop();
                                     channel = createChannel();
                                     CHANNEL_INFO.set(channel, {
-                                        player1: socket,
-                                        player2: "computer",
+                                        player1: socket.id,
+                                        player2: "Computer",
                                     });
                                     socket.join(channel);
                                     return [4 /*yield*/, fetchParagraph()];
                                 case 1:
                                     paragraph = _a.sent();
-                                    socket.emit("competitor", "computer");
-                                    io.to(channel).emit("challenge_details", {
+                                    message = {
                                         channel: channel,
                                         paragraph: paragraph,
-                                    });
+                                        playerOneInfo: {
+                                            userName: userName,
+                                        },
+                                        playerTwoInfo: {
+                                            userName: "Robot",
+                                            isRobot: true,
+                                        },
+                                    };
+                                    io.to(channel).emit("challenge_details", message);
                                     return [2 /*return*/];
                             }
                         });
@@ -123,25 +134,34 @@ function startPlayHandler(socket, io, userName) {
                         clearTimeout(timer);
                         timer = null;
                     }
-                    _a = PLAYER_STACK.shift(), competetorSocket = _a.socket, competetorUserName = _a.userName;
+                    _a = PLAYER_QUEUE.shift(), competitorSocket = _a.socket, competitorUserName = _a.userName;
                     channel = createChannel();
                     CHANNEL_INFO.set(channel, {
-                        player1: competetorSocket,
-                        player2: socket,
+                        player1: competitorSocket.id,
+                        player2: socket.id,
                     });
-                    socket.emit("competitor", competetorUserName);
-                    competetorSocket.emit("competitor", userName);
-                    for (_i = 0, _b = [competetorSocket, socket]; _i < _b.length; _i++) {
+                    // socket.emit("competitor", competitorUserName);
+                    // competitorSocket.emit("competitor", userName);
+                    for (_i = 0, _b = [competitorSocket, socket]; _i < _b.length; _i++) {
                         userSocket = _b[_i];
                         userSocket.join(channel);
                     }
                     return [4 /*yield*/, fetchParagraph()];
                 case 2:
-                    parapgraph = _c.sent();
-                    io.to(channel).emit("challenge_details", {
+                    paragraph = _c.sent();
+                    message = {
                         channel: channel,
-                        parapgraph: parapgraph,
-                    });
+                        paragraph: paragraph,
+                        playerOneInfo: {
+                            userName: competitorUserName,
+                            socketId: competitorSocket.id,
+                        },
+                        playerTwoInfo: {
+                            userName: userName,
+                            socketId: socket.id,
+                        },
+                    };
+                    io.to(channel).emit("challenge_details", message);
                     console.log("gameplay");
                     _c.label = 3;
                 case 3: return [2 /*return*/];
@@ -150,7 +170,7 @@ function startPlayHandler(socket, io, userName) {
     });
 }
 io.on("connection", function (socket) {
-    console.log("A user has connected");
+    console.log("A user has connected", socket.id);
     socket.on("start-play", function (userName) {
         startPlayHandler(socket, io, userName);
     });
