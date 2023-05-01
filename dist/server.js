@@ -57,16 +57,17 @@ var cors_1 = __importDefault(require("cors"));
 var uuid_1 = require("uuid");
 var Constants_1 = require("./Constants");
 var app = express_1.default();
-app.use(cors_1.default({ origin: "http://localhost:3000" }));
+app.use(cors_1.default({ origin: "http://192.168.0.132:3000" }));
 var server = http_1.default.createServer(app);
 var io = new socket_io_1.Server(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "http://192.168.0.132:3000",
     },
 });
 var PLAYER_QUEUE = [];
 var CHANNEL_INFO = new Map();
 var timer = null;
+var waitingResultTimer = null;
 function createChannel() {
     return uuid_1.v4();
 }
@@ -100,7 +101,6 @@ function startPlayHandler(socket, io, userName) {
         return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
-                    console.log("start play request");
                     if (!(PLAYER_QUEUE.length === 0)) return [3 /*break*/, 1];
                     player = {
                         userName: userName,
@@ -196,18 +196,22 @@ function startPlayHandler(socket, io, userName) {
 function getRobotScore() {
     return Constants_1.ROBOT_SCORE[0];
 }
+function sendChallengeResult(io, channel, challengeResult) {
+    io.to(channel).emit("challenge_result", challengeResult);
+}
 function onChallengeScoreHandler(io, message) {
     try {
-        var channel = message.channel;
-        var channelInfo = CHANNEL_INFO.get(channel);
-        var challengeResult = {};
+        var channel_1 = message.channel;
+        var channelInfo = CHANNEL_INFO.get(channel_1);
+        var challengeResult_1 = {};
         if (channelInfo) {
+            var sendResult = true;
             var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-            var socketId = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
+            var socketId_1 = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
             if (playerTwoResult.isRobot) {
                 var robotScore = getRobotScore();
                 var robotNetWpm = robotScore.netWpm, robotAccuracyInPerc = robotScore.accuracyInPerc;
-                challengeResult = {
+                challengeResult_1 = {
                     playerOneResult: __assign(__assign({}, (playerOneResult && playerOneResult)), { score: {
                             wpm: wpm,
                             netWpm: netWpm,
@@ -217,70 +221,82 @@ function onChallengeScoreHandler(io, message) {
                 };
                 if (netWpm === robotNetWpm) {
                     if (robotAccuracyInPerc === accuracyInPerc) {
-                        challengeResult.draw = true;
+                        challengeResult_1.draw = true;
                     }
                     else if (robotAccuracyInPerc > accuracyInPerc) {
-                        challengeResult.winner = Constants_1.ROBOT;
+                        challengeResult_1.winner = Constants_1.ROBOT;
                     }
                     else {
-                        challengeResult.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
+                        challengeResult_1.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
                     }
                 }
                 else if (robotNetWpm > netWpm) {
-                    challengeResult.winner = Constants_1.ROBOT;
+                    challengeResult_1.winner = Constants_1.ROBOT;
                 }
                 else {
-                    challengeResult.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
+                    challengeResult_1.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
                 }
             }
             else {
                 var playerResult = void 0;
                 var otherPlayerResult = void 0;
-                if (socketId === playerOneResult.socketId) {
+                var isPlayerOne = false;
+                if (socketId_1 === playerOneResult.socketId) {
+                    isPlayerOne = true;
                     playerResult = playerOneResult;
-                    challengeResult = __assign(__assign({}, challengeResult), { playerOneResult: playerOneResult });
                     otherPlayerResult = playerTwoResult;
                 }
-                else if (socketId === playerTwoResult.socketId) {
+                else if (socketId_1 === playerTwoResult.socketId) {
                     playerResult = playerTwoResult;
-                    challengeResult = __assign(__assign({}, challengeResult), { playerTwoResult: playerTwoResult });
                     otherPlayerResult = playerOneResult;
                 }
                 else {
                     throw new Error("Socket does not exist in the channel");
                 }
-                if (otherPlayerResult.isScoreRecieved) {
+                playerResult.score = {
+                    wpm: wpm,
+                    netWpm: netWpm,
+                    accuracyInPerc: accuracyInPerc,
+                };
+                challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerOneResult: playerResult })), (!isPlayerOne && { playerTwoResult: playerResult }));
+                if (!otherPlayerResult.isScoreRecieved) {
                     playerResult.isScoreRecieved = true;
-                    playerResult.score = {
-                        wpm: wpm,
-                        netWpm: netWpm,
-                        accuracyInPerc: accuracyInPerc,
-                    };
+                    sendResult = false;
+                    waitingResultTimer = setTimeout(function () {
+                        // Did not recieved other player result
+                        challengeResult_1.winner = socketId_1;
+                        sendChallengeResult(io, channel_1, challengeResult_1);
+                    }, 5000);
                 }
                 else {
+                    if (waitingResultTimer) {
+                        clearTimeout(waitingResultTimer);
+                    }
+                    challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerTwoResult: otherPlayerResult })), (!isPlayerOne && { playerOneResult: otherPlayerResult }));
                     var score = otherPlayerResult.score;
                     if (score && (score === null || score === void 0 ? void 0 : score.netWpm) === netWpm) {
                         if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) === accuracyInPerc) {
-                            challengeResult.draw = true;
+                            challengeResult_1.draw = true;
                         }
                         else if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) > accuracyInPerc) {
-                            challengeResult.winner = otherPlayerResult.socketId;
+                            challengeResult_1.winner = otherPlayerResult.socketId;
                         }
                         else {
-                            challengeResult.winner = playerResult.socketId;
+                            challengeResult_1.winner = playerResult.socketId;
                         }
                     }
                     else if (score && (score === null || score === void 0 ? void 0 : score.netWpm) > netWpm) {
-                        challengeResult.winner = otherPlayerResult.socketId;
+                        challengeResult_1.winner = otherPlayerResult.socketId;
                     }
                     else {
-                        challengeResult.winner = playerResult.socketId;
+                        challengeResult_1.winner = playerResult.socketId;
                     }
                 }
             }
+            if (sendResult) {
+                sendChallengeResult(io, channel_1, challengeResult_1);
+            }
         }
-        console.log({ challengeResult: challengeResult, channel: channel });
-        io.to(channel).emit("challenge_result", challengeResult);
     }
     catch (e) {
         console.log(e);

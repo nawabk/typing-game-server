@@ -18,13 +18,13 @@ import {
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({ origin: "http://192.168.0.132:3000" }));
 
 const server = http.createServer(app);
 
 const io: Server = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "http://192.168.0.132:3000",
   },
 });
 
@@ -33,6 +33,7 @@ const PLAYER_QUEUE: Player[] = [];
 const CHANNEL_INFO: Map<string, GameInfo> = new Map();
 
 let timer: ReturnType<typeof setTimeout> | null = null;
+let waitingResultTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createChannel(): string {
   return uuidv4();
@@ -52,7 +53,6 @@ async function fetchParagraph(): Promise<string> {
 }
 
 async function startPlayHandler(socket: Socket, io: Server, userName: string) {
-  console.log("start play request");
   if (PLAYER_QUEUE.length === 0) {
     const player = {
       userName,
@@ -136,12 +136,21 @@ function getRobotScore(): Score {
   return ROBOT_SCORE[0];
 }
 
+function sendChallengeResult(
+  io: Server,
+  channel: string,
+  challengeResult: Partial<ChallengeResult>
+) {
+  io.to(channel).emit("challenge_result", challengeResult);
+}
+
 function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
   try {
     const { channel } = message;
     const channelInfo = CHANNEL_INFO.get(channel);
     let challengeResult: Partial<ChallengeResult> = {};
     if (channelInfo) {
+      let sendResult: boolean = true;
       const { playerOneResult, playerTwoResult } = channelInfo;
       const { socketId, wpm, netWpm, accuracyInPerc } = message;
 
@@ -179,32 +188,46 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
       } else {
         let playerResult;
         let otherPlayerResult;
+        let isPlayerOne = false;
         if (socketId === playerOneResult.socketId) {
+          isPlayerOne = true;
           playerResult = playerOneResult;
-          challengeResult = {
-            ...challengeResult,
-            playerOneResult,
-          };
           otherPlayerResult = playerTwoResult;
         } else if (socketId === playerTwoResult.socketId) {
           playerResult = playerTwoResult;
-          challengeResult = {
-            ...challengeResult,
-            playerTwoResult,
-          };
           otherPlayerResult = playerOneResult;
         } else {
           throw new Error("Socket does not exist in the channel");
         }
-        if (otherPlayerResult.isScoreRecieved) {
+        playerResult.score = {
+          wpm,
+          netWpm,
+          accuracyInPerc,
+        };
+        challengeResult = {
+          ...challengeResult,
+          ...(isPlayerOne && { playerOneResult: playerResult }),
+          ...(!isPlayerOne && { playerTwoResult: playerResult }),
+        };
+        if (!otherPlayerResult.isScoreRecieved) {
           playerResult.isScoreRecieved = true;
-          playerResult.score = {
-            wpm,
-            netWpm,
-            accuracyInPerc,
-          };
+          sendResult = false;
+          waitingResultTimer = setTimeout(() => {
+            // Did not recieved other player result
+            challengeResult.winner = socketId;
+            sendChallengeResult(io, channel, challengeResult);
+          }, 5000);
         } else {
+          if (waitingResultTimer) {
+            clearTimeout(waitingResultTimer);
+          }
+          challengeResult = {
+            ...challengeResult,
+            ...(isPlayerOne && { playerTwoResult: otherPlayerResult }),
+            ...(!isPlayerOne && { playerOneResult: otherPlayerResult }),
+          };
           const { score } = otherPlayerResult;
+
           if (score && score?.netWpm === netWpm) {
             if (score?.accuracyInPerc === accuracyInPerc) {
               challengeResult.draw = true;
@@ -220,9 +243,10 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
           }
         }
       }
+      if (sendResult) {
+        sendChallengeResult(io, channel, challengeResult);
+      }
     }
-    console.log({ challengeResult, channel });
-    io.to(channel).emit("challenge_result", challengeResult);
   } catch (e) {
     console.log(e);
   }
