@@ -12,6 +12,7 @@ export interface PlayerResultInfo {
   isScoreRecieved?: boolean;
   score: Score;
   isRobot: boolean;
+  isLeftChannel: boolean;
 }
 
 export interface GameInfo {
@@ -52,4 +53,8 @@ export interface ChallengeScoreMessage {
   wpm: number;
   netWpm: number;
   accuracyInPerc: number;
+}
+
+export interface LeaveChannelMessage {
+  channel: string;
 }

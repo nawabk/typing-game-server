@@ -10,6 +10,7 @@ import {
   ChallengeResult,
   ChallengeScoreMessage,
   GameInfo,
+  LeaveChannelMessage,
   Player,
   PlayerResultInfo,
   ResponseData,
@@ -197,7 +198,9 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
           playerResult = playerTwoResult;
           otherPlayerResult = playerOneResult;
         } else {
-          throw new Error("Socket does not exist in the channel");
+          throw new Error(
+            "Socket does not exist in the channel---Challenge Score Handler"
+          );
         }
         playerResult.score = {
           wpm,
@@ -252,6 +255,46 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
   }
 }
 
+// check to delete Channel Info
+
+function checkIfChannelCanBeDeleted(channel: string) {
+  const channelInfo = CHANNEL_INFO.get(channel);
+  if (channelInfo) {
+    const { playerOneResult, playerTwoResult } = channelInfo;
+    if (playerTwoResult.isRobot) {
+      CHANNEL_INFO.delete(channel);
+      console.log("Channel Deleted");
+    } else if (playerOneResult.isLeftChannel && playerTwoResult.isLeftChannel) {
+      CHANNEL_INFO.delete(channel);
+      console.log("Channel Deleted");
+    }
+  }
+}
+
+// leave channel handler
+function onLeaveChannel(socket: Socket, message: LeaveChannelMessage) {
+  try {
+    const { channel } = message;
+    const channelInfo = CHANNEL_INFO.get(channel);
+    socket.leave(channel);
+    if (channelInfo) {
+      const { playerOneResult, playerTwoResult } = channelInfo;
+      const { socketId: playerOneSocketId } = playerOneResult;
+      const { socketId: playerTwoSocketId } = playerTwoResult;
+      if (socket.id === playerOneSocketId) {
+        playerOneResult.isLeftChannel = true;
+      } else if (socket.id === playerTwoSocketId) {
+        playerTwoResult.isLeftChannel = true;
+      } else {
+        throw new Error("Socket Id not matched --- Channel Leave");
+      }
+      checkIfChannelCanBeDeleted(channel);
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}
+
 io.on("connection", (socket: Socket) => {
   console.log("A user has connected", socket.id);
   socket.on("start_play", (userName) => {
@@ -259,6 +302,12 @@ io.on("connection", (socket: Socket) => {
   });
   socket.on("challenge_score", (message) => {
     onChallengeScoreHandler(io, message);
+  });
+  socket.on("leave_channel", (message) => {
+    onLeaveChannel(socket, message);
+  });
+  socket.on("disconnect", () => {
+    console.log("disconnected");
   });
 });
 

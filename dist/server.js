@@ -251,7 +251,7 @@ function onChallengeScoreHandler(io, message) {
                     otherPlayerResult = playerOneResult;
                 }
                 else {
-                    throw new Error("Socket does not exist in the channel");
+                    throw new Error("Socket does not exist in the channel---Challenge Score Handler");
                 }
                 playerResult.score = {
                     wpm: wpm,
@@ -302,6 +302,47 @@ function onChallengeScoreHandler(io, message) {
         console.log(e);
     }
 }
+// check to delete Channel Info
+function checkIfChannelCanBeDeleted(channel) {
+    var channelInfo = CHANNEL_INFO.get(channel);
+    if (channelInfo) {
+        var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+        if (playerTwoResult.isRobot) {
+            CHANNEL_INFO.delete(channel);
+            console.log("Channel Deleted");
+        }
+        else if (playerOneResult.isLeftChannel && playerTwoResult.isLeftChannel) {
+            CHANNEL_INFO.delete(channel);
+            console.log("Channel Deleted");
+        }
+    }
+}
+// leave channel handler
+function onLeaveChannel(socket, message) {
+    try {
+        var channel = message.channel;
+        var channelInfo = CHANNEL_INFO.get(channel);
+        socket.leave(channel);
+        if (channelInfo) {
+            var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+            var playerOneSocketId = playerOneResult.socketId;
+            var playerTwoSocketId = playerTwoResult.socketId;
+            if (socket.id === playerOneSocketId) {
+                playerOneResult.isLeftChannel = true;
+            }
+            else if (socket.id === playerTwoSocketId) {
+                playerTwoResult.isLeftChannel = true;
+            }
+            else {
+                throw new Error("Socket Id not matched --- Channel Leave");
+            }
+            checkIfChannelCanBeDeleted(channel);
+        }
+    }
+    catch (e) {
+        console.log(e);
+    }
+}
 io.on("connection", function (socket) {
     console.log("A user has connected", socket.id);
     socket.on("start_play", function (userName) {
@@ -309,6 +350,12 @@ io.on("connection", function (socket) {
     });
     socket.on("challenge_score", function (message) {
         onChallengeScoreHandler(io, message);
+    });
+    socket.on("leave_channel", function (message) {
+        onLeaveChannel(socket, message);
+    });
+    socket.on("disconnect", function () {
+        console.log("disconnected");
     });
 });
 var PORT = process.env.PORT || 5000;
