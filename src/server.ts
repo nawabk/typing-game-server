@@ -13,6 +13,8 @@ import {
   LeaveChannelMessage,
   Player,
   PlayerResultInfo,
+  RematchMessage,
+  RematchRequestMessage,
   ResponseData,
   Score,
 } from "./types";
@@ -271,6 +273,26 @@ function checkIfChannelCanBeDeleted(channel: string) {
   }
 }
 
+function checkIfPlayerOne(channel: string, socketId: string): boolean {
+  const channelInfo = CHANNEL_INFO.get(channel);
+  if (channelInfo) {
+    const { playerOneResult, playerTwoResult } = channelInfo;
+    const { socketId: playerOneSocketId } = playerOneResult;
+    const { socketId: playerTwoSocketId } = playerTwoResult;
+    if (socketId === playerOneSocketId) {
+      return true;
+    } else if (socketId === playerTwoSocketId) {
+      return false;
+    } else {
+      throw new Error("Socket Id not matched");
+    }
+  } else {
+    throw new Error(
+      "No Channel Information --- Checking Player No. based on socketId"
+    );
+  }
+}
+
 // leave channel handler
 function onLeaveChannel(socket: Socket, message: LeaveChannelMessage) {
   try {
@@ -279,16 +301,50 @@ function onLeaveChannel(socket: Socket, message: LeaveChannelMessage) {
     socket.leave(channel);
     if (channelInfo) {
       const { playerOneResult, playerTwoResult } = channelInfo;
-      const { socketId: playerOneSocketId } = playerOneResult;
-      const { socketId: playerTwoSocketId } = playerTwoResult;
-      if (socket.id === playerOneSocketId) {
+      const isPlayerOne = checkIfPlayerOne(channel, socket.id);
+      if (isPlayerOne) {
         playerOneResult.isLeftChannel = true;
-      } else if (socket.id === playerTwoSocketId) {
-        playerTwoResult.isLeftChannel = true;
       } else {
-        throw new Error("Socket Id not matched --- Channel Leave");
+        playerTwoResult.isLeftChannel = true;
       }
       checkIfChannelCanBeDeleted(channel);
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+// Rematch request handler
+async function onRematchRequest(
+  socket: Socket,
+  io: Server,
+  message: RematchRequestMessage
+) {
+  try {
+    const { channel } = message;
+    const channelInfo = CHANNEL_INFO.get(channel);
+    if (channelInfo) {
+      let askingPlayer, competitorPlayer;
+      const { playerOneResult, playerTwoResult } = channelInfo;
+      const isPlayerOne = checkIfPlayerOne(channel, socket.id);
+      if (isPlayerOne) {
+        askingPlayer = playerOneResult;
+        competitorPlayer = playerTwoResult;
+      } else {
+        askingPlayer = playerTwoResult;
+        competitorPlayer = playerOneResult;
+      }
+      if (competitorPlayer.isAskingForRematch) {
+        competitorPlayer.isAskingForRematch = false;
+        const paragraph = await fetchParagraph();
+        const message: RematchMessage = {
+          paragraph,
+        };
+        io.to(channel).emit("rematch", message);
+      } else {
+        askingPlayer.isAskingForRematch = true;
+        socket.to(channel).emit("rematch_request");
+      }
     }
   } catch (e) {
     console.log(e);
@@ -305,6 +361,9 @@ io.on("connection", (socket: Socket) => {
   });
   socket.on("leave_channel", (message) => {
     onLeaveChannel(socket, message);
+  });
+  socket.on("rematch_request", (message) => {
+    onRematchRequest(socket, io, message);
   });
   socket.on("disconnect", () => {
     console.log("disconnected");

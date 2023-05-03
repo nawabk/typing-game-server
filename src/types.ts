@@ -13,6 +13,7 @@ export interface PlayerResultInfo {
   score: Score;
   isRobot: boolean;
   isLeftChannel: boolean;
+  isAskingForRematch: boolean;
 }
 
 export interface GameInfo {
@@ -57,4 +58,12 @@ export interface ChallengeScoreMessage {
 
 export interface LeaveChannelMessage {
   channel: string;
+}
+
+export interface RematchRequestMessage {
+  channel: string;
+}
+
+export interface RematchMessage {
+  paragraph: string;
 }

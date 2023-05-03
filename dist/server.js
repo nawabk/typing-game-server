@@ -317,6 +317,26 @@ function checkIfChannelCanBeDeleted(channel) {
         }
     }
 }
+function checkIfPlayerOne(channel, socketId) {
+    var channelInfo = CHANNEL_INFO.get(channel);
+    if (channelInfo) {
+        var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+        var playerOneSocketId = playerOneResult.socketId;
+        var playerTwoSocketId = playerTwoResult.socketId;
+        if (socketId === playerOneSocketId) {
+            return true;
+        }
+        else if (socketId === playerTwoSocketId) {
+            return false;
+        }
+        else {
+            throw new Error("Socket Id not matched");
+        }
+    }
+    else {
+        throw new Error("No Channel Information --- Checking Player No. based on socketId");
+    }
+}
 // leave channel handler
 function onLeaveChannel(socket, message) {
     try {
@@ -325,16 +345,12 @@ function onLeaveChannel(socket, message) {
         socket.leave(channel);
         if (channelInfo) {
             var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-            var playerOneSocketId = playerOneResult.socketId;
-            var playerTwoSocketId = playerTwoResult.socketId;
-            if (socket.id === playerOneSocketId) {
+            var isPlayerOne = checkIfPlayerOne(channel, socket.id);
+            if (isPlayerOne) {
                 playerOneResult.isLeftChannel = true;
             }
-            else if (socket.id === playerTwoSocketId) {
-                playerTwoResult.isLeftChannel = true;
-            }
             else {
-                throw new Error("Socket Id not matched --- Channel Leave");
+                playerTwoResult.isLeftChannel = true;
             }
             checkIfChannelCanBeDeleted(channel);
         }
@@ -342,6 +358,52 @@ function onLeaveChannel(socket, message) {
     catch (e) {
         console.log(e);
     }
+}
+// Rematch request handler
+function onRematchRequest(socket, io, message) {
+    return __awaiter(this, void 0, void 0, function () {
+        var channel, channelInfo, askingPlayer, competitorPlayer, playerOneResult, playerTwoResult, isPlayerOne, paragraph, message_1, e_2;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 4, , 5]);
+                    channel = message.channel;
+                    channelInfo = CHANNEL_INFO.get(channel);
+                    if (!channelInfo) return [3 /*break*/, 3];
+                    askingPlayer = void 0, competitorPlayer = void 0;
+                    playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+                    isPlayerOne = checkIfPlayerOne(channel, socket.id);
+                    if (isPlayerOne) {
+                        askingPlayer = playerOneResult;
+                        competitorPlayer = playerTwoResult;
+                    }
+                    else {
+                        askingPlayer = playerTwoResult;
+                        competitorPlayer = playerOneResult;
+                    }
+                    if (!competitorPlayer.isAskingForRematch) return [3 /*break*/, 2];
+                    competitorPlayer.isAskingForRematch = false;
+                    return [4 /*yield*/, fetchParagraph()];
+                case 1:
+                    paragraph = _a.sent();
+                    message_1 = {
+                        paragraph: paragraph,
+                    };
+                    io.to(channel).emit("rematch", message_1);
+                    return [3 /*break*/, 3];
+                case 2:
+                    askingPlayer.isAskingForRematch = true;
+                    socket.to(channel).emit("rematch_request");
+                    _a.label = 3;
+                case 3: return [3 /*break*/, 5];
+                case 4:
+                    e_2 = _a.sent();
+                    console.log(e_2);
+                    return [3 /*break*/, 5];
+                case 5: return [2 /*return*/];
+            }
+        });
+    });
 }
 io.on("connection", function (socket) {
     console.log("A user has connected", socket.id);
@@ -353,6 +415,9 @@ io.on("connection", function (socket) {
     });
     socket.on("leave_channel", function (message) {
         onLeaveChannel(socket, message);
+    });
+    socket.on("rematch_request", function (message) {
+        onRematchRequest(socket, io, message);
     });
     socket.on("disconnect", function () {
         console.log("disconnected");
