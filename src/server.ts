@@ -12,7 +12,7 @@ import {
   GameInfo,
   LeaveChannelMessage,
   Player,
-  PlayerResultInfo,
+  RematchErrorMessage,
   RematchMessage,
   RematchRequestMessage,
   ResponseData,
@@ -314,6 +314,18 @@ function onLeaveChannel(socket: Socket, message: LeaveChannelMessage) {
   }
 }
 
+function sendErrorMessage<T extends string | undefined>(
+  socket: Socket,
+  competitorUserName: T
+) {
+  const message: RematchErrorMessage = {
+    errMsg: `${
+      competitorUserName ? competitorUserName : "Competitor"
+    } is not available for rematch`,
+  };
+  socket.emit("rematch_error", message);
+}
+
 // Rematch request handler
 async function onRematchRequest(
   socket: Socket,
@@ -334,16 +346,21 @@ async function onRematchRequest(
         askingPlayer = playerTwoResult;
         competitorPlayer = playerOneResult;
       }
-      if (competitorPlayer.isAskingForRematch) {
-        competitorPlayer.isAskingForRematch = false;
-        const paragraph = await fetchParagraph();
-        const message: RematchMessage = {
-          paragraph,
-        };
-        io.to(channel).emit("rematch", message);
+      if (competitorPlayer.isLeftChannel) {
+        // send error message
+        sendErrorMessage(socket, competitorPlayer.userName);
       } else {
-        askingPlayer.isAskingForRematch = true;
-        socket.to(channel).emit("rematch_request");
+        if (competitorPlayer.isAskingForRematch) {
+          competitorPlayer.isAskingForRematch = false;
+          const paragraph = await fetchParagraph();
+          const message: RematchMessage = {
+            paragraph,
+          };
+          io.to(channel).emit("rematch", message);
+        } else {
+          askingPlayer.isAskingForRematch = true;
+          socket.to(channel).emit("rematch_request");
+        }
       }
     }
   } catch (e) {

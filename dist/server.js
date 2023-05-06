@@ -359,6 +359,12 @@ function onLeaveChannel(socket, message) {
         console.log(e);
     }
 }
+function sendErrorMessage(socket, competitorUserName) {
+    var message = {
+        errMsg: (competitorUserName ? competitorUserName : "Competitor") + " is not available for rematch",
+    };
+    socket.emit("rematch_error", message);
+}
 // Rematch request handler
 function onRematchRequest(socket, io, message) {
     return __awaiter(this, void 0, void 0, function () {
@@ -366,10 +372,10 @@ function onRematchRequest(socket, io, message) {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 4, , 5]);
+                    _a.trys.push([0, 5, , 6]);
                     channel = message.channel;
                     channelInfo = CHANNEL_INFO.get(channel);
-                    if (!channelInfo) return [3 /*break*/, 3];
+                    if (!channelInfo) return [3 /*break*/, 4];
                     askingPlayer = void 0, competitorPlayer = void 0;
                     playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
                     isPlayerOne = checkIfPlayerOne(channel, socket.id);
@@ -381,26 +387,31 @@ function onRematchRequest(socket, io, message) {
                         askingPlayer = playerTwoResult;
                         competitorPlayer = playerOneResult;
                     }
-                    if (!competitorPlayer.isAskingForRematch) return [3 /*break*/, 2];
+                    if (!competitorPlayer.isLeftChannel) return [3 /*break*/, 1];
+                    // send error message
+                    sendErrorMessage(socket, competitorPlayer.userName);
+                    return [3 /*break*/, 4];
+                case 1:
+                    if (!competitorPlayer.isAskingForRematch) return [3 /*break*/, 3];
                     competitorPlayer.isAskingForRematch = false;
                     return [4 /*yield*/, fetchParagraph()];
-                case 1:
+                case 2:
                     paragraph = _a.sent();
                     message_1 = {
                         paragraph: paragraph,
                     };
                     io.to(channel).emit("rematch", message_1);
-                    return [3 /*break*/, 3];
-                case 2:
+                    return [3 /*break*/, 4];
+                case 3:
                     askingPlayer.isAskingForRematch = true;
                     socket.to(channel).emit("rematch_request");
-                    _a.label = 3;
-                case 3: return [3 /*break*/, 5];
-                case 4:
+                    _a.label = 4;
+                case 4: return [3 /*break*/, 6];
+                case 5:
                     e_2 = _a.sent();
                     console.log(e_2);
-                    return [3 /*break*/, 5];
-                case 5: return [2 /*return*/];
+                    return [3 /*break*/, 6];
+                case 6: return [2 /*return*/];
             }
         });
     });
