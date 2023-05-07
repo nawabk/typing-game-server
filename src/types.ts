@@ -1,4 +1,4 @@
-import { Socket } from "socket.io";
+import Player from "./Player";
 
 export interface Score {
   wpm: number;
@@ -6,46 +6,35 @@ export interface Score {
   accuracyInPerc: number;
 }
 
-export interface PlayerResultInfo {
+export interface PlayerInfo {
   socketId: string;
   userName: string;
   isScoreRecieved?: boolean;
-  score: Score;
-  isRobot: boolean;
-  isLeftChannel: boolean;
-  isAskingForRematch: boolean;
+  score?: Score;
+  isRobot?: boolean;
+  isLeftChannel?: boolean;
+  isAskingForRematch?: boolean;
 }
 
 export interface GameInfo {
-  playerOneResult: Partial<PlayerResultInfo>;
-  playerTwoResult: Partial<PlayerResultInfo>;
+  playerOne: Player;
+  playerTwo: Player;
 }
 
 export interface ChallengeResult {
-  playerOneResult: Partial<PlayerResultInfo>;
-  playerTwoResult: Partial<PlayerResultInfo>;
+  playerOneResult: Partial<Player>;
+  playerTwoResult: Partial<Player>;
   winner: string;
   draw?: boolean;
 }
 
 export type ResponseData = string[];
 
-export interface Player {
-  socket: Socket;
-  userName: string;
-}
-
-type PlayerInfo = {
-  socketId?: string;
-  userName: string;
-  isRobot?: boolean;
-};
-
 export interface ChallengeDetailsMessage {
   channel: string;
   paragraph: string;
-  playerOneInfo: PlayerInfo;
-  playerTwoInfo: PlayerInfo;
+  playerOne: Player;
+  playerTwo: Player;
 }
 
 export interface ChallengeScoreMessage {

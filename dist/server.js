@@ -56,6 +56,7 @@ var http_1 = __importDefault(require("http"));
 var cors_1 = __importDefault(require("cors"));
 var uuid_1 = require("uuid");
 var Constants_1 = require("./Constants");
+var Player_1 = __importDefault(require("./Player"));
 var app = express_1.default();
 app.use(cors_1.default({ origin: "http://192.168.0.132:3000" }));
 var server = http_1.default.createServer(app);
@@ -65,7 +66,8 @@ var io = new socket_io_1.Server(server, {
     },
 });
 var PLAYER_QUEUE = [];
-var CHANNEL_INFO = new Map();
+var PlayerInfoBySocketId = new Map();
+var ChannelInfoByChannel = new Map();
 var timer = null;
 var waitingResultTimer = null;
 function createChannel() {
@@ -96,51 +98,44 @@ function fetchParagraph() {
 }
 function startPlayHandler(socket, io, userName) {
     return __awaiter(this, void 0, void 0, function () {
-        var player, _a, competitorSocket, competitorUserName, channel, _i, _b, userSocket, paragraph, message;
+        var channel_1, playerOne_1, playerOne, channel, playerTwo, paragraph, message;
         var _this = this;
-        return __generator(this, function (_c) {
-            switch (_c.label) {
+        return __generator(this, function (_a) {
+            switch (_a.label) {
                 case 0:
                     if (!(PLAYER_QUEUE.length === 0)) return [3 /*break*/, 1];
-                    player = {
-                        userName: userName,
-                        socket: socket,
-                    };
-                    PLAYER_QUEUE.push(player);
+                    channel_1 = createChannel();
+                    playerOne_1 = new Player_1.default({ socketId: socket.id, userName: userName, channel: channel_1 });
+                    socket.join(channel_1);
+                    PlayerInfoBySocketId.set(socket.id, playerOne_1);
+                    PLAYER_QUEUE.push(playerOne_1);
                     timer = setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
-                        var channel, paragraph, message;
+                        var playerTwo, paragraph, message;
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0:
                                     console.log("still no user");
                                     PLAYER_QUEUE.pop();
-                                    channel = createChannel();
-                                    CHANNEL_INFO.set(channel, {
-                                        playerOneResult: {
-                                            socketId: socket.id,
-                                            userName: userName,
-                                        },
-                                        playerTwoResult: {
-                                            isRobot: true,
-                                            userName: Constants_1.ROBOT,
-                                        },
+                                    playerTwo = new Player_1.default({
+                                        socketId: "",
+                                        userName: Constants_1.ROBOT,
+                                        isRobot: true,
+                                        channel: channel_1,
                                     });
-                                    socket.join(channel);
+                                    ChannelInfoByChannel.set(channel_1, {
+                                        playerOne: playerOne_1,
+                                        playerTwo: playerTwo,
+                                    });
                                     return [4 /*yield*/, fetchParagraph()];
                                 case 1:
                                     paragraph = _a.sent();
                                     message = {
-                                        channel: channel,
+                                        channel: channel_1,
                                         paragraph: paragraph,
-                                        playerOneInfo: {
-                                            userName: userName,
-                                        },
-                                        playerTwoInfo: {
-                                            userName: Constants_1.ROBOT,
-                                            isRobot: true,
-                                        },
+                                        playerOne: playerOne_1,
+                                        playerTwo: playerTwo,
                                     };
-                                    io.to(channel).emit("challenge_details", message);
+                                    io.to(channel_1).emit("challenge_details", message);
                                     return [2 /*return*/];
                             }
                         });
@@ -151,42 +146,27 @@ function startPlayHandler(socket, io, userName) {
                         clearTimeout(timer);
                         timer = null;
                     }
-                    _a = PLAYER_QUEUE.shift(), competitorSocket = _a.socket, competitorUserName = _a.userName;
-                    channel = createChannel();
-                    CHANNEL_INFO.set(channel, {
-                        playerOneResult: {
-                            socketId: competitorSocket.id,
-                            userName: competitorUserName,
-                        },
-                        playerTwoResult: {
-                            socketId: socket.id,
-                            userName: userName,
-                        },
+                    playerOne = PLAYER_QUEUE.shift();
+                    channel = playerOne.getChannel;
+                    playerTwo = new Player_1.default({ socketId: socket.id, userName: userName, channel: channel });
+                    socket.join(channel);
+                    PlayerInfoBySocketId.set(socket.id, playerTwo);
+                    ChannelInfoByChannel.set(channel, {
+                        playerOne: playerOne,
+                        playerTwo: playerTwo,
                     });
-                    // socket.emit("competitor", competitorUserName);
-                    // competitorSocket.emit("competitor", userName);
-                    for (_i = 0, _b = [competitorSocket, socket]; _i < _b.length; _i++) {
-                        userSocket = _b[_i];
-                        userSocket.join(channel);
-                    }
                     return [4 /*yield*/, fetchParagraph()];
                 case 2:
-                    paragraph = _c.sent();
+                    paragraph = _a.sent();
                     message = {
                         channel: channel,
                         paragraph: paragraph,
-                        playerOneInfo: {
-                            userName: competitorUserName,
-                            socketId: competitorSocket.id,
-                        },
-                        playerTwoInfo: {
-                            userName: userName,
-                            socketId: socket.id,
-                        },
+                        playerOne: playerOne,
+                        playerTwo: playerTwo,
                     };
                     io.to(channel).emit("challenge_details", message);
                     console.log("gameplay");
-                    _c.label = 3;
+                    _a.label = 3;
                 case 3: return [2 /*return*/];
             }
         });
@@ -196,133 +176,12 @@ function startPlayHandler(socket, io, userName) {
 function getRobotScore() {
     return Constants_1.ROBOT_SCORE[0];
 }
-function sendChallengeResult(io, channel, challengeResult) {
-    io.to(channel).emit("challenge_result", challengeResult);
-}
-function onChallengeScoreHandler(io, message) {
-    try {
-        var channel_1 = message.channel;
-        var channelInfo = CHANNEL_INFO.get(channel_1);
-        var challengeResult_1 = {};
-        if (channelInfo) {
-            var sendResult = true;
-            var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-            var socketId_1 = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
-            if (playerTwoResult.isRobot) {
-                var robotScore = getRobotScore();
-                var robotNetWpm = robotScore.netWpm, robotAccuracyInPerc = robotScore.accuracyInPerc;
-                challengeResult_1 = {
-                    playerOneResult: __assign(__assign({}, (playerOneResult && playerOneResult)), { score: {
-                            wpm: wpm,
-                            netWpm: netWpm,
-                            accuracyInPerc: accuracyInPerc,
-                        } }),
-                    playerTwoResult: __assign(__assign({}, (playerTwoResult && playerTwoResult)), { score: robotScore }),
-                };
-                if (netWpm === robotNetWpm) {
-                    if (robotAccuracyInPerc === accuracyInPerc) {
-                        challengeResult_1.draw = true;
-                    }
-                    else if (robotAccuracyInPerc > accuracyInPerc) {
-                        challengeResult_1.winner = Constants_1.ROBOT;
-                    }
-                    else {
-                        challengeResult_1.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
-                    }
-                }
-                else if (robotNetWpm > netWpm) {
-                    challengeResult_1.winner = Constants_1.ROBOT;
-                }
-                else {
-                    challengeResult_1.winner = playerOneResult === null || playerOneResult === void 0 ? void 0 : playerOneResult.socketId;
-                }
-            }
-            else {
-                var playerResult = void 0;
-                var otherPlayerResult = void 0;
-                var isPlayerOne = false;
-                if (socketId_1 === playerOneResult.socketId) {
-                    isPlayerOne = true;
-                    playerResult = playerOneResult;
-                    otherPlayerResult = playerTwoResult;
-                }
-                else if (socketId_1 === playerTwoResult.socketId) {
-                    playerResult = playerTwoResult;
-                    otherPlayerResult = playerOneResult;
-                }
-                else {
-                    throw new Error("Socket does not exist in the channel---Challenge Score Handler");
-                }
-                playerResult.score = {
-                    wpm: wpm,
-                    netWpm: netWpm,
-                    accuracyInPerc: accuracyInPerc,
-                };
-                challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerOneResult: playerResult })), (!isPlayerOne && { playerTwoResult: playerResult }));
-                if (!otherPlayerResult.isScoreRecieved) {
-                    playerResult.isScoreRecieved = true;
-                    sendResult = false;
-                    waitingResultTimer = setTimeout(function () {
-                        // Did not recieved other player result
-                        challengeResult_1.winner = socketId_1;
-                        sendChallengeResult(io, channel_1, challengeResult_1);
-                    }, 5000);
-                }
-                else {
-                    if (waitingResultTimer) {
-                        clearTimeout(waitingResultTimer);
-                    }
-                    challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerTwoResult: otherPlayerResult })), (!isPlayerOne && { playerOneResult: otherPlayerResult }));
-                    var score = otherPlayerResult.score;
-                    if (score && (score === null || score === void 0 ? void 0 : score.netWpm) === netWpm) {
-                        if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) === accuracyInPerc) {
-                            challengeResult_1.draw = true;
-                        }
-                        else if ((score === null || score === void 0 ? void 0 : score.accuracyInPerc) > accuracyInPerc) {
-                            challengeResult_1.winner = otherPlayerResult.socketId;
-                        }
-                        else {
-                            challengeResult_1.winner = playerResult.socketId;
-                        }
-                    }
-                    else if (score && (score === null || score === void 0 ? void 0 : score.netWpm) > netWpm) {
-                        challengeResult_1.winner = otherPlayerResult.socketId;
-                    }
-                    else {
-                        challengeResult_1.winner = playerResult.socketId;
-                    }
-                }
-            }
-            if (sendResult) {
-                sendChallengeResult(io, channel_1, challengeResult_1);
-            }
-        }
-    }
-    catch (e) {
-        console.log(e);
-    }
-}
-// check to delete Channel Info
-function checkIfChannelCanBeDeleted(channel) {
-    var channelInfo = CHANNEL_INFO.get(channel);
-    if (channelInfo) {
-        var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-        if (playerTwoResult.isRobot) {
-            CHANNEL_INFO.delete(channel);
-            console.log("Channel Deleted");
-        }
-        else if (playerOneResult.isLeftChannel && playerTwoResult.isLeftChannel) {
-            CHANNEL_INFO.delete(channel);
-            console.log("Channel Deleted");
-        }
-    }
-}
 function checkIfPlayerOne(channel, socketId) {
-    var channelInfo = CHANNEL_INFO.get(channel);
+    var channelInfo = ChannelInfoByChannel.get(channel);
     if (channelInfo) {
-        var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-        var playerOneSocketId = playerOneResult.socketId;
-        var playerTwoSocketId = playerTwoResult.socketId;
+        var playerOne = channelInfo.playerOne, playerTwo = channelInfo.playerTwo;
+        var playerOneSocketId = playerOne.getSocketId;
+        var playerTwoSocketId = playerTwo.getSocketId;
         if (socketId === playerOneSocketId) {
             return true;
         }
@@ -337,21 +196,153 @@ function checkIfPlayerOne(channel, socketId) {
         throw new Error("No Channel Information --- Checking Player No. based on socketId");
     }
 }
-// leave channel handler
-function onLeaveChannel(socket, message) {
+function sendChallengeResult(io, channel, challengeResult) {
+    io.to(channel).emit("challenge_result", challengeResult);
+}
+function onChallengeScoreHandler(io, message) {
     try {
-        var channel = message.channel;
-        var channelInfo = CHANNEL_INFO.get(channel);
-        socket.leave(channel);
+        var channel_2 = message.channel;
+        var channelInfo = ChannelInfoByChannel.get(channel_2);
+        var challengeResult_1 = {};
         if (channelInfo) {
-            var playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
-            var isPlayerOne = checkIfPlayerOne(channel, socket.id);
-            if (isPlayerOne) {
-                playerOneResult.isLeftChannel = true;
+            var sendResult = true;
+            var playerOne = channelInfo.playerOne, playerTwo = channelInfo.playerTwo;
+            var socketId_1 = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
+            var isPlayerTwoRobot = playerTwo.getIsRobot;
+            if (isPlayerTwoRobot) {
+                var playerOneSocketId = playerOne.getSocketId;
+                var robotScore = getRobotScore();
+                var robotNetWpm = robotScore.netWpm, robotAccuracyInPerc = robotScore.accuracyInPerc;
+                playerOne.setScore = {
+                    wpm: wpm,
+                    netWpm: netWpm,
+                    accuracyInPerc: accuracyInPerc,
+                };
+                playerTwo.setScore = robotScore;
+                challengeResult_1 = {
+                    playerOneResult: __assign({}, (playerOne && playerOne)),
+                    playerTwoResult: __assign({}, (playerTwo && playerTwo)),
+                };
+                if (netWpm === robotNetWpm) {
+                    if (robotAccuracyInPerc === accuracyInPerc) {
+                        challengeResult_1.draw = true;
+                    }
+                    else if (robotAccuracyInPerc > accuracyInPerc) {
+                        challengeResult_1.winner = Constants_1.ROBOT;
+                    }
+                    else {
+                        challengeResult_1.winner = playerOneSocketId;
+                    }
+                }
+                else if (robotNetWpm > netWpm) {
+                    challengeResult_1.winner = Constants_1.ROBOT;
+                }
+                else {
+                    challengeResult_1.winner = playerOneSocketId;
+                }
             }
             else {
-                playerTwoResult.isLeftChannel = true;
+                var playerResult = void 0;
+                var otherPlayerResult = void 0;
+                var isPlayerOne = checkIfPlayerOne(channel_2, socketId_1);
+                if (isPlayerOne) {
+                    playerResult = playerOne;
+                    otherPlayerResult = playerTwo;
+                }
+                else {
+                    playerResult = playerTwo;
+                    otherPlayerResult = playerOne;
+                }
+                playerResult.setScore = {
+                    wpm: wpm,
+                    netWpm: netWpm,
+                    accuracyInPerc: accuracyInPerc,
+                };
+                challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerOneResult: playerResult })), (!isPlayerOne && { playerTwoResult: playerResult }));
+                var isOtherPlayerRecieved = otherPlayerResult.getIsScoreRecieved;
+                if (!isOtherPlayerRecieved) {
+                    playerResult.setIsScoreRecieved = true;
+                    sendResult = false;
+                    waitingResultTimer = setTimeout(function () {
+                        // Did not recieved other player result
+                        challengeResult_1.winner = socketId_1;
+                        // otherPlayerResult.setScore = {
+                        //   wpm: 0,
+                        //   netWpm: 0,
+                        //   accuracyInPerc: 0,
+                        // };
+                        // challengeResult = {
+                        //   ...challengeResult,
+                        //   ...(isPlayerOne && { playerTwoResult: otherPlayerResult }),
+                        //   ...(!isPlayerOne && { playerOneResult: otherPlayerResult }),
+                        // };
+                        sendChallengeResult(io, channel_2, challengeResult_1);
+                    }, 5000);
+                }
+                else {
+                    if (waitingResultTimer) {
+                        clearTimeout(waitingResultTimer);
+                    }
+                    challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerTwoResult: otherPlayerResult })), (!isPlayerOne && { playerOneResult: otherPlayerResult }));
+                    var playerResultSocketId = playerResult.getSocketId;
+                    var otherPlayerResultSocketId = otherPlayerResult.getSocketId;
+                    var otherPlayerScore = otherPlayerResult.getScore;
+                    if (otherPlayerScore && (otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.netWpm) === netWpm) {
+                        if ((otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.accuracyInPerc) === accuracyInPerc) {
+                            challengeResult_1.draw = true;
+                        }
+                        else if ((otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.accuracyInPerc) > accuracyInPerc) {
+                            challengeResult_1.winner = otherPlayerResultSocketId;
+                        }
+                        else {
+                            challengeResult_1.winner = playerResultSocketId;
+                        }
+                    }
+                    else if (otherPlayerScore && (otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.netWpm) > netWpm) {
+                        challengeResult_1.winner = otherPlayerResultSocketId;
+                    }
+                    else {
+                        challengeResult_1.winner = playerResultSocketId;
+                    }
+                }
             }
+            if (sendResult) {
+                sendChallengeResult(io, channel_2, challengeResult_1);
+            }
+        }
+    }
+    catch (e) {
+        console.log(e);
+    }
+}
+// check to delete Channel Info
+function checkIfChannelCanBeDeleted(channel) {
+    var channelInfo = ChannelInfoByChannel.get(channel);
+    if (channelInfo) {
+        var playerOne = channelInfo.playerOne, playerTwo = channelInfo.playerTwo;
+        var isPlayerTwoRobot = playerTwo.getIsRobot;
+        var isPlayerOneLeftChannel = playerOne.getIsLeftChannel;
+        var isPlayerTwoLeftChannel = playerTwo.getIsLeftChannel;
+        if (isPlayerTwoRobot) {
+            ChannelInfoByChannel.delete(channel);
+            console.log("Channel Deleted");
+        }
+        else if (isPlayerOneLeftChannel && isPlayerTwoLeftChannel) {
+            ChannelInfoByChannel.delete(channel);
+            console.log("Channel Deleted");
+        }
+    }
+}
+// leave channel handler
+function onLeaveChannel(socket) {
+    try {
+        var socketId = socket.id;
+        var player = PlayerInfoBySocketId.get(socketId);
+        if (player) {
+            // remove player info
+            PlayerInfoBySocketId.delete(socketId);
+            player.setIsLeftChannel = true;
+            var channel = player.getChannel;
             checkIfChannelCanBeDeleted(channel);
         }
     }
@@ -368,32 +359,35 @@ function sendErrorMessage(socket, competitorUserName) {
 // Rematch request handler
 function onRematchRequest(socket, io, message) {
     return __awaiter(this, void 0, void 0, function () {
-        var channel, channelInfo, askingPlayer, competitorPlayer, playerOneResult, playerTwoResult, isPlayerOne, paragraph, message_1, e_2;
+        var channel, channelInfo, askingPlayer, competitorPlayer, playerOne, playerTwo, isPlayerOne, isCompetitorLeftChannel, competitorUserName, isCompetitorAskingForRematch, paragraph, message_1, e_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     _a.trys.push([0, 5, , 6]);
                     channel = message.channel;
-                    channelInfo = CHANNEL_INFO.get(channel);
+                    channelInfo = ChannelInfoByChannel.get(channel);
                     if (!channelInfo) return [3 /*break*/, 4];
                     askingPlayer = void 0, competitorPlayer = void 0;
-                    playerOneResult = channelInfo.playerOneResult, playerTwoResult = channelInfo.playerTwoResult;
+                    playerOne = channelInfo.playerOne, playerTwo = channelInfo.playerTwo;
                     isPlayerOne = checkIfPlayerOne(channel, socket.id);
                     if (isPlayerOne) {
-                        askingPlayer = playerOneResult;
-                        competitorPlayer = playerTwoResult;
+                        askingPlayer = playerOne;
+                        competitorPlayer = playerTwo;
                     }
                     else {
-                        askingPlayer = playerTwoResult;
-                        competitorPlayer = playerOneResult;
+                        askingPlayer = playerTwo;
+                        competitorPlayer = playerOne;
                     }
-                    if (!competitorPlayer.isLeftChannel) return [3 /*break*/, 1];
+                    isCompetitorLeftChannel = competitorPlayer.getIsLeftChannel;
+                    competitorUserName = competitorPlayer.getUserName;
+                    isCompetitorAskingForRematch = competitorPlayer.getIsAskingForRematch;
+                    if (!isCompetitorLeftChannel) return [3 /*break*/, 1];
                     // send error message
-                    sendErrorMessage(socket, competitorPlayer.userName);
+                    sendErrorMessage(socket, competitorUserName);
                     return [3 /*break*/, 4];
                 case 1:
-                    if (!competitorPlayer.isAskingForRematch) return [3 /*break*/, 3];
-                    competitorPlayer.isAskingForRematch = false;
+                    if (!isCompetitorAskingForRematch) return [3 /*break*/, 3];
+                    competitorPlayer.setIsAskingForRematch = false;
                     return [4 /*yield*/, fetchParagraph()];
                 case 2:
                     paragraph = _a.sent();
@@ -403,7 +397,7 @@ function onRematchRequest(socket, io, message) {
                     io.to(channel).emit("rematch", message_1);
                     return [3 /*break*/, 4];
                 case 3:
-                    askingPlayer.isAskingForRematch = true;
+                    askingPlayer.setIsAskingForRematch = true;
                     socket.to(channel).emit("rematch_request");
                     _a.label = 4;
                 case 4: return [3 /*break*/, 6];
@@ -416,6 +410,17 @@ function onRematchRequest(socket, io, message) {
         });
     });
 }
+function onDisconnect(socket) {
+    var socketId = socket.id;
+    var player = PlayerInfoBySocketId.get(socketId);
+    if (player) {
+        // remove player info
+        PlayerInfoBySocketId.delete(socketId);
+        player.setIsLeftChannel = true;
+        var channel = player.getChannel;
+        checkIfChannelCanBeDeleted(channel);
+    }
+}
 io.on("connection", function (socket) {
     console.log("A user has connected", socket.id);
     socket.on("start_play", function (userName) {
@@ -424,14 +429,14 @@ io.on("connection", function (socket) {
     socket.on("challenge_score", function (message) {
         onChallengeScoreHandler(io, message);
     });
-    socket.on("leave_channel", function (message) {
-        onLeaveChannel(socket, message);
+    socket.on("leave_channel", function () {
+        onLeaveChannel(socket);
     });
     socket.on("rematch_request", function (message) {
         onRematchRequest(socket, io, message);
     });
     socket.on("disconnect", function () {
-        console.log("disconnected");
+        onDisconnect(socket);
     });
 });
 var PORT = process.env.PORT || 5000;
