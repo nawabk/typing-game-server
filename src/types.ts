@@ -19,6 +19,7 @@ export interface PlayerInfo {
 export interface GameInfo {
   playerOne: Player;
   playerTwo: Player;
+  waitingTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 export interface ChallengeResult {

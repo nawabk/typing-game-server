@@ -59,6 +59,10 @@ var Constants_1 = require("./Constants");
 var Player_1 = __importDefault(require("./Player"));
 var app = express_1.default();
 app.use(cors_1.default({ origin: "http://192.168.0.132:3000" }));
+// Check life
+app.get("/", function (_, res) {
+    res.send("Hello Typist");
+});
 var server = http_1.default.createServer(app);
 var io = new socket_io_1.Server(server, {
     cors: {
@@ -69,7 +73,6 @@ var PLAYER_QUEUE = [];
 var PlayerInfoBySocketId = new Map();
 var ChannelInfoByChannel = new Map();
 var timer = null;
-var waitingResultTimer = null;
 function createChannel() {
     return uuid_1.v4();
 }
@@ -243,50 +246,47 @@ function onChallengeScoreHandler(io, message) {
             }
             else {
                 var playerResult = void 0;
-                var otherPlayerResult = void 0;
-                var isPlayerOne = checkIfPlayerOne(channel_2, socketId_1);
-                if (isPlayerOne) {
+                var otherPlayerResult_1;
+                var isPlayerOne_1 = checkIfPlayerOne(channel_2, socketId_1);
+                if (isPlayerOne_1) {
                     playerResult = playerOne;
-                    otherPlayerResult = playerTwo;
+                    otherPlayerResult_1 = playerTwo;
                 }
                 else {
                     playerResult = playerTwo;
-                    otherPlayerResult = playerOne;
+                    otherPlayerResult_1 = playerOne;
                 }
                 playerResult.setScore = {
                     wpm: wpm,
                     netWpm: netWpm,
                     accuracyInPerc: accuracyInPerc,
                 };
-                challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerOneResult: playerResult })), (!isPlayerOne && { playerTwoResult: playerResult }));
-                var isOtherPlayerRecieved = otherPlayerResult.getIsScoreRecieved;
+                challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne_1 && { playerOneResult: playerResult })), (!isPlayerOne_1 && { playerTwoResult: playerResult }));
+                var isOtherPlayerRecieved = otherPlayerResult_1.getIsScoreRecieved;
                 if (!isOtherPlayerRecieved) {
                     playerResult.setIsScoreRecieved = true;
                     sendResult = false;
-                    waitingResultTimer = setTimeout(function () {
+                    channelInfo.waitingTimer = setTimeout(function () {
                         // Did not recieved other player result
                         challengeResult_1.winner = socketId_1;
-                        // otherPlayerResult.setScore = {
-                        //   wpm: 0,
-                        //   netWpm: 0,
-                        //   accuracyInPerc: 0,
-                        // };
-                        // challengeResult = {
-                        //   ...challengeResult,
-                        //   ...(isPlayerOne && { playerTwoResult: otherPlayerResult }),
-                        //   ...(!isPlayerOne && { playerOneResult: otherPlayerResult }),
-                        // };
+                        otherPlayerResult_1.setScore = {
+                            wpm: 0,
+                            netWpm: 0,
+                            accuracyInPerc: 0,
+                        };
+                        challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne_1 && { playerTwoResult: otherPlayerResult_1 })), (!isPlayerOne_1 && { playerOneResult: otherPlayerResult_1 }));
                         sendChallengeResult(io, channel_2, challengeResult_1);
                     }, 5000);
                 }
                 else {
-                    if (waitingResultTimer) {
-                        clearTimeout(waitingResultTimer);
+                    if (channelInfo.waitingTimer) {
+                        clearTimeout(channelInfo.waitingTimer);
+                        channelInfo.waitingTimer = null;
                     }
-                    challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne && { playerTwoResult: otherPlayerResult })), (!isPlayerOne && { playerOneResult: otherPlayerResult }));
+                    challengeResult_1 = __assign(__assign(__assign({}, challengeResult_1), (isPlayerOne_1 && { playerTwoResult: otherPlayerResult_1 })), (!isPlayerOne_1 && { playerOneResult: otherPlayerResult_1 }));
                     var playerResultSocketId = playerResult.getSocketId;
-                    var otherPlayerResultSocketId = otherPlayerResult.getSocketId;
-                    var otherPlayerScore = otherPlayerResult.getScore;
+                    var otherPlayerResultSocketId = otherPlayerResult_1.getSocketId;
+                    var otherPlayerScore = otherPlayerResult_1.getScore;
                     if (otherPlayerScore && (otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.netWpm) === netWpm) {
                         if ((otherPlayerScore === null || otherPlayerScore === void 0 ? void 0 : otherPlayerScore.accuracyInPerc) === accuracyInPerc) {
                             challengeResult_1.draw = true;

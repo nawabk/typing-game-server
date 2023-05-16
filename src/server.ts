@@ -22,6 +22,11 @@ const app = express();
 
 app.use(cors({ origin: "http://192.168.0.132:3000" }));
 
+// Check life
+app.get("/", (_, res) => {
+  res.send("Hello Typist");
+});
+
 const server = http.createServer(app);
 
 const io: Server = new Server(server, {
@@ -37,7 +42,6 @@ const PlayerInfoBySocketId = new Map<string, Player>();
 const ChannelInfoByChannel: Map<string, GameInfo> = new Map();
 
 let timer: ReturnType<typeof setTimeout> | null = null;
-let waitingResultTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createChannel(): string {
   return uuidv4();
@@ -189,8 +193,8 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
           challengeResult.winner = playerOneSocketId;
         }
       } else {
-        let playerResult;
-        let otherPlayerResult;
+        let playerResult: Player;
+        let otherPlayerResult: Player;
         let isPlayerOne = checkIfPlayerOne(channel, socketId);
         if (isPlayerOne) {
           playerResult = playerOne;
@@ -215,24 +219,25 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
         if (!isOtherPlayerRecieved) {
           playerResult.setIsScoreRecieved = true;
           sendResult = false;
-          waitingResultTimer = setTimeout(() => {
+          channelInfo.waitingTimer = setTimeout(() => {
             // Did not recieved other player result
             challengeResult.winner = socketId;
-            // otherPlayerResult.setScore = {
-            //   wpm: 0,
-            //   netWpm: 0,
-            //   accuracyInPerc: 0,
-            // };
-            // challengeResult = {
-            //   ...challengeResult,
-            //   ...(isPlayerOne && { playerTwoResult: otherPlayerResult }),
-            //   ...(!isPlayerOne && { playerOneResult: otherPlayerResult }),
-            // };
+            otherPlayerResult.setScore = {
+              wpm: 0,
+              netWpm: 0,
+              accuracyInPerc: 0,
+            };
+            challengeResult = {
+              ...challengeResult,
+              ...(isPlayerOne && { playerTwoResult: otherPlayerResult }),
+              ...(!isPlayerOne && { playerOneResult: otherPlayerResult }),
+            };
             sendChallengeResult(io, channel, challengeResult);
           }, 5000);
         } else {
-          if (waitingResultTimer) {
-            clearTimeout(waitingResultTimer);
+          if (channelInfo.waitingTimer) {
+            clearTimeout(channelInfo.waitingTimer);
+            channelInfo.waitingTimer = null;
           }
           challengeResult = {
             ...challengeResult,
@@ -324,7 +329,7 @@ async function onRematchRequest(
     const { channel } = message;
     const channelInfo = ChannelInfoByChannel.get(channel);
     if (channelInfo) {
-      let askingPlayer, competitorPlayer;
+      let askingPlayer: Player, competitorPlayer: Player;
       const { playerOne, playerTwo } = channelInfo;
       const isPlayerOne = checkIfPlayerOne(channel, socket.id);
       if (isPlayerOne) {
