@@ -59,6 +59,7 @@ var Constants_1 = require("./Constants");
 var Player_1 = __importDefault(require("./Player"));
 var app = express_1.default();
 app.use(cors_1.default({ origin: "https://www.typing-fight.com/" }));
+// app.use(cors({ origin: "http://192.168.0.132:3000" }));
 // Check life
 app.get("/", function (_, res) {
     res.send("Hello Typist");
@@ -66,7 +67,7 @@ app.get("/", function (_, res) {
 var server = http_1.default.createServer(app);
 var io = new socket_io_1.Server(server, {
     cors: {
-        // origin: "https://192.168.0.132:3000",
+        // origin: "http://192.168.0.132:3000",
         origin: "https://www.typing-fight.com/",
     },
 });
