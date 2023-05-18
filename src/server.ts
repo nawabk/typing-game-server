@@ -20,7 +20,7 @@ import Player from "./Player";
 
 const app = express();
 
-app.use(cors({ origin: "http://192.168.0.132:3000" }));
+app.use(cors({ origin: "https://www.typing-fight.com/" }));
 
 // Check life
 app.get("/", (_, res) => {
@@ -31,7 +31,8 @@ const server = http.createServer(app);
 
 const io: Server = new Server(server, {
   cors: {
-    origin: "http://192.168.0.132:3000",
+    // origin: "https://192.168.0.132:3000",
+    origin: "https://www.typing-fight.com/",
   },
 });
 
