@@ -21,5 +21,6 @@
     "@types/socket.io": "^3.0.2",
     "@types/uuid": "^9.0.1",
     "nodemon": "^2.0.22"
-  }
+  },
+  "repository": "git@github.com:nawabk/typing-game-server.git"
 }
