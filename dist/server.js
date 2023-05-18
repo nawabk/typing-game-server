@@ -51,6 +51,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var express_1 = __importDefault(require("express"));
+var node_fetch_1 = __importDefault(require("node-fetch"));
 var socket_io_1 = require("socket.io");
 var http_1 = __importDefault(require("http"));
 var cors_1 = __importDefault(require("cors"));
@@ -85,7 +86,7 @@ function fetchParagraph() {
             switch (_a.label) {
                 case 0:
                     _a.trys.push([0, 3, , 4]);
-                    return [4 /*yield*/, fetch("https://hipsum.co/api/?type=hipster-centric&sentences=50")];
+                    return [4 /*yield*/, node_fetch_1.default("https://hipsum.co/api/?type=hipster-centric&sentences=50")];
                 case 1:
                     res = _a.sent();
                     return [4 /*yield*/, res.json()];
