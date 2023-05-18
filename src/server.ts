@@ -68,7 +68,6 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
     PlayerInfoBySocketId.set(socket.id, playerOne);
     PLAYER_QUEUE.push(playerOne);
     timer = setTimeout(async () => {
-      console.log("still no user");
       PLAYER_QUEUE.pop();
       const playerTwo = new Player({
         socketId: "",
@@ -87,6 +86,7 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
         playerOne,
         playerTwo,
       };
+      console.log(`${playerOne.getUserName} vs ${playerTwo.getUserName}`);
       io.to(channel).emit("challenge_details", message);
     }, 5 * 1000);
   } else {
@@ -110,8 +110,8 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       playerOne,
       playerTwo,
     };
+    console.log(`${playerOne.getUserName} vs ${playerTwo.getUserName}`);
     io.to(channel).emit("challenge_details", message);
-    console.log("gameplay");
   }
 }
 
@@ -282,10 +282,8 @@ function checkIfChannelCanBeDeleted(channel: string) {
     const isPlayerTwoLeftChannel = playerTwo.getIsLeftChannel;
     if (isPlayerTwoRobot) {
       ChannelInfoByChannel.delete(channel);
-      console.log("Channel Deleted");
     } else if (isPlayerOneLeftChannel && isPlayerTwoLeftChannel) {
       ChannelInfoByChannel.delete(channel);
-      console.log("Channel Deleted");
     }
   }
 }
@@ -378,7 +376,6 @@ function onDisconnect(socket: Socket) {
 }
 
 io.on("connection", (socket: Socket) => {
-  console.log("A user has connected", socket.id);
   socket.on("start_play", (userName) => {
     startPlayHandler(socket, io, userName);
   });

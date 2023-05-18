@@ -117,7 +117,6 @@ function startPlayHandler(socket, io, userName) {
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0:
-                                    console.log("still no user");
                                     PLAYER_QUEUE.pop();
                                     playerTwo = new Player_1.default({
                                         socketId: "",
@@ -138,6 +137,7 @@ function startPlayHandler(socket, io, userName) {
                                         playerOne: playerOne_1,
                                         playerTwo: playerTwo,
                                     };
+                                    console.log(playerOne_1.getUserName + " vs " + playerTwo.getUserName);
                                     io.to(channel_1).emit("challenge_details", message);
                                     return [2 /*return*/];
                             }
@@ -167,8 +167,8 @@ function startPlayHandler(socket, io, userName) {
                         playerOne: playerOne,
                         playerTwo: playerTwo,
                     };
+                    console.log(playerOne.getUserName + " vs " + playerTwo.getUserName);
                     io.to(channel).emit("challenge_details", message);
-                    console.log("gameplay");
                     _a.label = 3;
                 case 3: return [2 /*return*/];
             }
@@ -325,11 +325,9 @@ function checkIfChannelCanBeDeleted(channel) {
         var isPlayerTwoLeftChannel = playerTwo.getIsLeftChannel;
         if (isPlayerTwoRobot) {
             ChannelInfoByChannel.delete(channel);
-            console.log("Channel Deleted");
         }
         else if (isPlayerOneLeftChannel && isPlayerTwoLeftChannel) {
             ChannelInfoByChannel.delete(channel);
-            console.log("Channel Deleted");
         }
     }
 }
@@ -422,7 +420,6 @@ function onDisconnect(socket) {
     }
 }
 io.on("connection", function (socket) {
-    console.log("A user has connected", socket.id);
     socket.on("start_play", function (userName) {
         startPlayHandler(socket, io, userName);
     });
