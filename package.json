@@ -4,8 +4,9 @@
   "description": "Server for typing game",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon dist/server.js"
+    "build": "tsc",
+    "dev": "nodemon dist/server.js",
+    "start": "node dist/server.js"
   },
   "author": "Md Khalid Nawab",
   "license": "ISC",
