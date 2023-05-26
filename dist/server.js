@@ -101,16 +101,22 @@ function fetchParagraph() {
         });
     });
 }
-function startPlayHandler(socket, io, userName) {
+function startPlayHandler(socket, io, message) {
     return __awaiter(this, void 0, void 0, function () {
-        var channel_1, playerOne_1, playerOne, channel, playerTwo, paragraph, message;
+        var userName, isMobileUser, channel_1, playerOne_1, playerOne, channel, playerTwo, paragraph, message_1;
         var _this = this;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
+                    userName = message.userName, isMobileUser = message.isMobileUser;
                     if (!(PLAYER_QUEUE.length === 0)) return [3 /*break*/, 1];
                     channel_1 = createChannel();
-                    playerOne_1 = new Player_1.default({ socketId: socket.id, userName: userName, channel: channel_1 });
+                    playerOne_1 = new Player_1.default({
+                        socketId: socket.id,
+                        userName: userName,
+                        channel: channel_1,
+                        isMobileUser: isMobileUser,
+                    });
                     socket.join(channel_1);
                     PlayerInfoBySocketId.set(socket.id, playerOne_1);
                     PLAYER_QUEUE.push(playerOne_1);
@@ -139,7 +145,7 @@ function startPlayHandler(socket, io, userName) {
                                         playerOne: playerOne_1,
                                         playerTwo: playerTwo,
                                     };
-                                    console.log(playerOne_1.getUserName + " vs " + playerTwo.getUserName);
+                                    console.log(playerOne_1.getUserName + "-" + (playerOne_1.getIsMobileUser ? "Mobile" : "Desktop") + " vs " + playerTwo.getUserName + "-" + (playerOne_1.getIsMobileUser ? "Mobile" : "Desktop"));
                                     io.to(channel_1).emit("challenge_details", message);
                                     return [2 /*return*/];
                             }
@@ -153,7 +159,12 @@ function startPlayHandler(socket, io, userName) {
                     }
                     playerOne = PLAYER_QUEUE.shift();
                     channel = playerOne.getChannel;
-                    playerTwo = new Player_1.default({ socketId: socket.id, userName: userName, channel: channel });
+                    playerTwo = new Player_1.default({
+                        socketId: socket.id,
+                        userName: userName,
+                        channel: channel,
+                        isMobileUser: isMobileUser,
+                    });
                     socket.join(channel);
                     PlayerInfoBySocketId.set(socket.id, playerTwo);
                     ChannelInfoByChannel.set(channel, {
@@ -163,14 +174,14 @@ function startPlayHandler(socket, io, userName) {
                     return [4 /*yield*/, fetchParagraph()];
                 case 2:
                     paragraph = _a.sent();
-                    message = {
+                    message_1 = {
                         channel: channel,
                         paragraph: paragraph,
                         playerOne: playerOne,
                         playerTwo: playerTwo,
                     };
-                    console.log(playerOne.getUserName + " vs " + playerTwo.getUserName);
-                    io.to(channel).emit("challenge_details", message);
+                    console.log(playerOne.getUserName + "-" + (playerOne.getIsMobileUser ? "Mobile" : "Desktop") + " vs " + playerTwo.getUserName + "-" + (playerOne.getIsMobileUser ? "Mobile" : "Desktop"));
+                    io.to(channel).emit("challenge_details", message_1);
                     _a.label = 3;
                 case 3: return [2 /*return*/];
             }
@@ -178,8 +189,15 @@ function startPlayHandler(socket, io, userName) {
     });
 }
 // onChallengeScore handler
-function getRobotScore() {
-    return Constants_1.ROBOT_SCORE[0];
+function getRobotScore(isPlayerMobileUser) {
+    var robotScore;
+    if (isPlayerMobileUser) {
+        robotScore = Constants_1.ROBOT_SCORE_MOBILE;
+    }
+    else {
+        robotScore = Constants_1.ROBOT_SCORE;
+    }
+    return robotScore[0];
 }
 function checkIfPlayerOne(channel, socketId) {
     var channelInfo = ChannelInfoByChannel.get(channel);
@@ -214,9 +232,10 @@ function onChallengeScoreHandler(io, message) {
             var playerOne = channelInfo.playerOne, playerTwo = channelInfo.playerTwo;
             var socketId_1 = message.socketId, wpm = message.wpm, netWpm = message.netWpm, accuracyInPerc = message.accuracyInPerc;
             var isPlayerTwoRobot = playerTwo.getIsRobot;
+            var isPlayerOneMobileUser = playerOne.getIsMobileUser;
             if (isPlayerTwoRobot) {
                 var playerOneSocketId = playerOne.getSocketId;
-                var robotScore = getRobotScore();
+                var robotScore = getRobotScore(isPlayerOneMobileUser);
                 var robotNetWpm = robotScore.netWpm, robotAccuracyInPerc = robotScore.accuracyInPerc;
                 playerOne.setScore = {
                     wpm: wpm,
@@ -359,7 +378,7 @@ function sendErrorMessage(socket, competitorUserName) {
 // Rematch request handler
 function onRematchRequest(socket, io, message) {
     return __awaiter(this, void 0, void 0, function () {
-        var channel, channelInfo, askingPlayer, competitorPlayer, playerOne, playerTwo, isPlayerOne, isCompetitorLeftChannel, competitorUserName, isCompetitorAskingForRematch, paragraph, message_1, e_2;
+        var channel, channelInfo, askingPlayer, competitorPlayer, playerOne, playerTwo, isPlayerOne, isCompetitorLeftChannel, competitorUserName, isCompetitorAskingForRematch, paragraph, message_2, e_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -391,10 +410,10 @@ function onRematchRequest(socket, io, message) {
                     return [4 /*yield*/, fetchParagraph()];
                 case 2:
                     paragraph = _a.sent();
-                    message_1 = {
+                    message_2 = {
                         paragraph: paragraph,
                     };
-                    io.to(channel).emit("rematch", message_1);
+                    io.to(channel).emit("rematch", message_2);
                     return [3 /*break*/, 4];
                 case 3:
                     askingPlayer.setIsAskingForRematch = true;
@@ -422,8 +441,8 @@ function onDisconnect(socket) {
     }
 }
 io.on("connection", function (socket) {
-    socket.on("start_play", function (userName) {
-        startPlayHandler(socket, io, userName);
+    socket.on("start_play", function (message) {
+        startPlayHandler(socket, io, message);
     });
     socket.on("challenge_score", function (message) {
         onChallengeScoreHandler(io, message);

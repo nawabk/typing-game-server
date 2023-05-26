@@ -12,3 +12,11 @@ export const ROBOT_SCORE: Score[] = [
     accuracyInPerc: 91.66,
   },
 ];
+
+export const ROBOT_SCORE_MOBILE: Score[] = [
+  {
+    wpm: 35,
+    netWpm: 30,
+    accuracyInPerc: 85.71,
+  },
+];

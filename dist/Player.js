@@ -2,11 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var Player = /** @class */ (function () {
     function Player(_a) {
-        var socketId = _a.socketId, userName = _a.userName, channel = _a.channel, _b = _a.isRobot, isRobot = _b === void 0 ? false : _b;
+        var socketId = _a.socketId, userName = _a.userName, channel = _a.channel, _b = _a.isMobileUser, isMobileUser = _b === void 0 ? false : _b, _c = _a.isRobot, isRobot = _c === void 0 ? false : _c;
         this.isRobot = isRobot;
         this.userName = userName;
         this.socketId = socketId;
         this.channel = channel;
+        this.isMobileUser = isMobileUser;
     }
     Object.defineProperty(Player.prototype, "getSocketId", {
         get: function () {
@@ -101,6 +102,14 @@ var Player = /** @class */ (function () {
         get: function () {
             var _a;
             return (_a = this.channel) !== null && _a !== void 0 ? _a : "";
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(Player.prototype, "getIsMobileUser", {
+        get: function () {
+            var _a;
+            return (_a = this.isMobileUser) !== null && _a !== void 0 ? _a : false;
         },
         enumerable: false,
         configurable: true

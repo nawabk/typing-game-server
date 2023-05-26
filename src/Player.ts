@@ -4,6 +4,7 @@ class Player {
   private socketId: string;
   private userName: string;
   private isRobot?: boolean;
+  private isMobileUser?: boolean;
   private channel: string;
   private isScoreRecieved?: boolean;
   private score?: Score;
@@ -14,17 +15,20 @@ class Player {
     socketId,
     userName,
     channel,
+    isMobileUser = false,
     isRobot = false,
   }: {
     socketId: string;
     userName: string;
     channel: string;
+    isMobileUser?: boolean;
     isRobot?: boolean;
   }) {
     this.isRobot = isRobot;
     this.userName = userName;
     this.socketId = socketId;
     this.channel = channel;
+    this.isMobileUser = isMobileUser;
   }
 
   get getSocketId(): string {
@@ -77,6 +81,10 @@ class Player {
 
   get getChannel() {
     return this.channel ?? "";
+  }
+
+  get getIsMobileUser() {
+    return this.isMobileUser ?? false;
   }
 }
 

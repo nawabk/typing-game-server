@@ -4,7 +4,12 @@ import type { Socket } from "socket.io";
 import http from "http";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import { LOREM_TEXT, ROBOT, ROBOT_SCORE } from "./Constants";
+import {
+  LOREM_TEXT,
+  ROBOT,
+  ROBOT_SCORE,
+  ROBOT_SCORE_MOBILE,
+} from "./Constants";
 import {
   ChallengeDetailsMessage,
   ChallengeResult,
@@ -15,6 +20,7 @@ import {
   RematchRequestMessage,
   ResponseData,
   Score,
+  StartPlayMessage,
 } from "./types";
 import Player from "./Player";
 
@@ -64,10 +70,20 @@ async function fetchParagraph(): Promise<string> {
   }
 }
 
-async function startPlayHandler(socket: Socket, io: Server, userName: string) {
+async function startPlayHandler(
+  socket: Socket,
+  io: Server,
+  message: StartPlayMessage
+) {
+  const { userName, isMobileUser } = message;
   if (PLAYER_QUEUE.length === 0) {
     const channel = createChannel();
-    const playerOne = new Player({ socketId: socket.id, userName, channel });
+    const playerOne = new Player({
+      socketId: socket.id,
+      userName,
+      channel,
+      isMobileUser,
+    });
     socket.join(channel);
     PlayerInfoBySocketId.set(socket.id, playerOne);
     PLAYER_QUEUE.push(playerOne);
@@ -90,7 +106,13 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
         playerOne,
         playerTwo,
       };
-      console.log(`${playerOne.getUserName} vs ${playerTwo.getUserName}`);
+      console.log(
+        `${playerOne.getUserName}-${
+          playerOne.getIsMobileUser ? "Mobile" : "Desktop"
+        } vs ${playerTwo.getUserName}-${
+          playerOne.getIsMobileUser ? "Mobile" : "Desktop"
+        }`
+      );
       io.to(channel).emit("challenge_details", message);
     }, 5 * 1000);
   } else {
@@ -100,7 +122,12 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
     }
     const playerOne = PLAYER_QUEUE.shift() as Player;
     const channel = playerOne.getChannel;
-    const playerTwo = new Player({ socketId: socket.id, userName, channel });
+    const playerTwo = new Player({
+      socketId: socket.id,
+      userName,
+      channel,
+      isMobileUser,
+    });
     socket.join(channel);
     PlayerInfoBySocketId.set(socket.id, playerTwo);
     ChannelInfoByChannel.set(channel, {
@@ -114,15 +141,27 @@ async function startPlayHandler(socket: Socket, io: Server, userName: string) {
       playerOne,
       playerTwo,
     };
-    console.log(`${playerOne.getUserName} vs ${playerTwo.getUserName}`);
+    console.log(
+      `${playerOne.getUserName}-${
+        playerOne.getIsMobileUser ? "Mobile" : "Desktop"
+      } vs ${playerTwo.getUserName}-${
+        playerOne.getIsMobileUser ? "Mobile" : "Desktop"
+      }`
+    );
     io.to(channel).emit("challenge_details", message);
   }
 }
 
 // onChallengeScore handler
 
-function getRobotScore(): Score {
-  return ROBOT_SCORE[0];
+function getRobotScore(isPlayerMobileUser: boolean): Score {
+  let robotScore;
+  if (isPlayerMobileUser) {
+    robotScore = ROBOT_SCORE_MOBILE;
+  } else {
+    robotScore = ROBOT_SCORE;
+  }
+  return robotScore[0];
 }
 
 function checkIfPlayerOne(channel: string, socketId: string): boolean {
@@ -164,9 +203,10 @@ function onChallengeScoreHandler(io: Server, message: ChallengeScoreMessage) {
       const { socketId, wpm, netWpm, accuracyInPerc } = message;
 
       const isPlayerTwoRobot = playerTwo.getIsRobot;
+      const isPlayerOneMobileUser = playerOne.getIsMobileUser;
       if (isPlayerTwoRobot) {
         const playerOneSocketId = playerOne.getSocketId;
-        const robotScore = getRobotScore();
+        const robotScore = getRobotScore(isPlayerOneMobileUser);
         const { netWpm: robotNetWpm, accuracyInPerc: robotAccuracyInPerc } =
           robotScore;
         playerOne.setScore = {
@@ -380,8 +420,8 @@ function onDisconnect(socket: Socket) {
 }
 
 io.on("connection", (socket: Socket) => {
-  socket.on("start_play", (userName) => {
-    startPlayHandler(socket, io, userName);
+  socket.on("start_play", (message) => {
+    startPlayHandler(socket, io, message);
   });
   socket.on("challenge_score", (message) => {
     onChallengeScoreHandler(io, message);
