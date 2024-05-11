@@ -25,7 +25,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
-        while (_) try {
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
             if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
             if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
@@ -50,15 +50,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var express_1 = __importDefault(require("express"));
-var socket_io_1 = require("socket.io");
-var http_1 = __importDefault(require("http"));
 var cors_1 = __importDefault(require("cors"));
+var express_1 = __importDefault(require("express"));
+var http_1 = __importDefault(require("http"));
+var socket_io_1 = require("socket.io");
 var uuid_1 = require("uuid");
 var Constants_1 = require("./Constants");
 var Player_1 = __importDefault(require("./Player"));
-var app = express_1.default();
-app.use(cors_1.default({ origin: ["https://www.typing-fight.com", "https://typing-fight.com"] }));
+var app = (0, express_1.default)();
+app.use((0, cors_1.default)({ origin: ["https://www.typingfight.in", "https://typingfight.in"] }));
 // app.use(cors({ origin: "http://192.168.0.132:3000" }));
 // Check life
 app.get("/", function (_, res) {
@@ -68,7 +68,7 @@ var server = http_1.default.createServer(app);
 var io = new socket_io_1.Server(server, {
     cors: {
         // origin: "http://192.168.0.132:3000",
-        origin: ["https://www.typing-fight.com", "https://typing-fight.com"],
+        origin: ["https://www.typingfight.in", "https://typingfight.in"],
     },
 });
 var PLAYER_QUEUE = [];
@@ -76,7 +76,7 @@ var PlayerInfoBySocketId = new Map();
 var ChannelInfoByChannel = new Map();
 var timer = null;
 function createChannel() {
-    return uuid_1.v4();
+    return (0, uuid_1.v4)();
 }
 function fetchParagraph() {
     return __awaiter(this, void 0, void 0, function () {
@@ -145,7 +145,7 @@ function startPlayHandler(socket, io, message) {
                                         playerOne: playerOne_1,
                                         playerTwo: playerTwo,
                                     };
-                                    console.log(playerOne_1.getUserName + "-" + (playerOne_1.getIsMobileUser ? "Mobile" : "Desktop") + " vs " + playerTwo.getUserName + "-" + (playerOne_1.getIsMobileUser ? "Mobile" : "Desktop"));
+                                    console.log("".concat(playerOne_1.getUserName, "-").concat(playerOne_1.getIsMobileUser ? "Mobile" : "Desktop", " vs ").concat(playerTwo.getUserName, "-").concat(playerOne_1.getIsMobileUser ? "Mobile" : "Desktop"));
                                     io.to(channel_1).emit("challenge_details", message);
                                     return [2 /*return*/];
                             }
@@ -180,7 +180,7 @@ function startPlayHandler(socket, io, message) {
                         playerOne: playerOne,
                         playerTwo: playerTwo,
                     };
-                    console.log(playerOne.getUserName + "-" + (playerOne.getIsMobileUser ? "Mobile" : "Desktop") + " vs " + playerTwo.getUserName + "-" + (playerOne.getIsMobileUser ? "Mobile" : "Desktop"));
+                    console.log("".concat(playerOne.getUserName, "-").concat(playerOne.getIsMobileUser ? "Mobile" : "Desktop", " vs ").concat(playerTwo.getUserName, "-").concat(playerOne.getIsMobileUser ? "Mobile" : "Desktop"));
                     io.to(channel).emit("challenge_details", message_1);
                     _a.label = 3;
                 case 3: return [2 /*return*/];
@@ -371,7 +371,7 @@ function onLeaveChannel(socket) {
 }
 function sendErrorMessage(socket, competitorUserName) {
     var message = {
-        errMsg: (competitorUserName ? competitorUserName : "Competitor") + " is not available for rematch",
+        errMsg: "".concat(competitorUserName ? competitorUserName : "Competitor", " is not available for rematch"),
     };
     socket.emit("rematch_error", message);
 }
@@ -459,5 +459,5 @@ io.on("connection", function (socket) {
 });
 var PORT = process.env.PORT || 5000;
 server.listen(PORT, function () {
-    console.log("Server listening to " + PORT);
+    console.log("Server listening to ".concat(PORT));
 });

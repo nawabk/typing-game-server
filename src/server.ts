@@ -1,8 +1,8 @@
-import express from "express";
-import { Server } from "socket.io";
-import type { Socket } from "socket.io";
-import http from "http";
 import cors from "cors";
+import express from "express";
+import http from "http";
+import type { Socket } from "socket.io";
+import { Server } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
 import {
   LOREM_TEXT,
@@ -10,6 +10,7 @@ import {
   ROBOT_SCORE,
   ROBOT_SCORE_MOBILE,
 } from "./Constants";
+import Player from "./Player";
 import {
   ChallengeDetailsMessage,
   ChallengeResult,
@@ -22,12 +23,11 @@ import {
   Score,
   StartPlayMessage,
 } from "./types";
-import Player from "./Player";
 
 const app = express();
 
 app.use(
-  cors({ origin: ["https://www.typing-fight.com", "https://typing-fight.com"] })
+  cors({ origin: ["https://www.typingfight.in", "https://typingfight.in"] })
 );
 // app.use(cors({ origin: "http://192.168.0.132:3000" }));
 
@@ -41,7 +41,7 @@ const server = http.createServer(app);
 const io: Server = new Server(server, {
   cors: {
     // origin: "http://192.168.0.132:3000",
-    origin: ["https://www.typing-fight.com", "https://typing-fight.com"],
+    origin: ["https://www.typingfight.in", "https://typingfight.in"],
   },
 });
 
